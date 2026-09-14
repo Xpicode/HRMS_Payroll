@@ -18,6 +18,7 @@ function buildNav(user: CurrentUser, company: CompanySummary | null) {
   const companyItems: NavItem[] = company
     ? [
         { href: `/app/${company.id}`, label: "Dashboard", icon: "dashboard", exact: true },
+        { href: `/app/${company.id}/employees`, label: "Employees", icon: "employees" },
         { href: `/app/${company.id}/holidays`, label: "Holidays", icon: "holidays" },
         ...(roleCan(user.role, "companies.update")
           ? [
