@@ -9,21 +9,20 @@ const LOAN_COMPONENTS: Record<LoanType, { code: string; label: string }> = {
 };
 
 /**
- * One amortization per period: the monthly amortization on a monthly payroll, half of it per
- * semi-monthly cutoff. Never more than the remaining balance; nothing once the balance is zero.
+ * One amortization per period, never more than the remaining balance; nothing once the
+ * balance is zero. The loan record carries the per-period amount, so the pay frequency does
+ * not matter here.
  */
 export function applyLoans(
   loans: LoanInput[],
-  period: EnginePeriod,
+  _period: EnginePeriod,
 ): { lines: PayslipLine[]; payments: LoanPayment[] } {
   const lines: PayslipLine[] = [];
   const payments: LoanPayment[] = [];
   for (const loan of loans) {
     const balance = money(loan.balance);
     if (balance.lte(0)) continue;
-    const monthly = money(loan.monthlyAmortization);
-    const perPeriod =
-      period.frequency === "MONTHLY" ? round2(monthly) : round2(monthly.dividedBy(2));
+    const perPeriod = round2(money(loan.amortization));
     const amount = Decimal.min(perPeriod, balance);
     if (amount.lte(0)) continue;
     const c = LOAN_COMPONENTS[loan.type];
@@ -37,6 +36,7 @@ export function applyLoans(
       rate: null,
       amount: amount.toFixed(2),
       taxable: false,
+      isManual: false,
       note: remaining.eq(0)
         ? "final payment"
         : `balance after: ${remaining.toFixed(2)}${amount.lt(perPeriod) ? " (capped at balance)" : ""}`,

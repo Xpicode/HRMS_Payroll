@@ -5,7 +5,7 @@ import { amountOf, COMPONENTS, paySetting, PERIOD_2ND, POLICY, summary, TABLES }
 /**
  * Negative net: minimum-wage daily employee (₱645.00) who worked only 2 of 11 scheduled days
  * (3 of the 9 absences are unrecorded), RH not worked, with a cash advance being amortized
- * (₱4,000 monthly, balance ₱5,000). Contributions are still on the full monthly basic.
+ * (₱2,000 per period, balance ₱5,000). Contributions are still on the full monthly basic.
  *
  * | Line                          | Basis                        |    Amount |
  * |-------------------------------|------------------------------|----------:|
@@ -15,7 +15,7 @@ import { amountOf, COMPONENTS, paySetting, PERIOD_2ND, POLICY, summary, TABLES }
  * | SSS                           | MSC 17,000 × 5%              |    850.00 |
  * | Pag-IBIG                      | 10,000 × 2%                  |    200.00 |
  * | PhilHealth                    | 16,823.75 × 5% ÷ 2           |    420.60 |
- * | Cash advance                  | ½ × 4,000.00                 |  2,000.00 |
+ * | Cash advance                  | 2,000.00 per period          |  2,000.00 |
  * | TOTAL DEDUCTIONS              |                              |  3,470.60 |
  * | NET PAY                       | flagged, not clamped         | −1,535.60 |
  */
@@ -35,9 +35,8 @@ describe("worked example: negative net", () => {
     tables: TABLES,
     components: COMPONENTS,
     recurring: [],
-    loans: [
-      { id: "CA1", type: "CASH_ADVANCE", monthlyAmortization: "4000.00", balance: "5000.00" },
-    ],
+    adjustments: [],
+    loans: [{ id: "CA1", type: "CASH_ADVANCE", amortization: "2000.00", balance: "5000.00" }],
   });
 
   it("computes the lines", () => {

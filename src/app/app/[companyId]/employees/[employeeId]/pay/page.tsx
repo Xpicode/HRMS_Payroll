@@ -54,7 +54,12 @@ export default async function PaySettingsPage({
         title={`${employee.lastName}, ${employee.firstName}`}
         description={employee.position ?? undefined}
       />
-      <EmployeeTabs companyId={companyId} employeeId={employeeId} active="pay" />
+      <EmployeeTabs
+        companyId={companyId}
+        employeeId={employeeId}
+        active="pay"
+        showLoans={roleCan(user.role, "loans.view")}
+      />
 
       {sp.created ? (
         <Alert className="mb-6 border-success/30 bg-success/5 text-success">

@@ -91,6 +91,25 @@ export function listEmployees(scope: Scope, companyId: string, asOf: Date) {
   });
 }
 
+/**
+ * Employees to pay for a period: hired by its end and either still active or separated on/after
+ * its start. ON_LEAVE employees are excluded (leave pay arrives with Phase 6).
+ */
+export function listForPayroll(scope: Scope, companyId: string, start: Date, end: Date) {
+  return scoped(scope).employee.findMany({
+    where: {
+      companyId,
+      hireDate: { lte: end },
+      OR: [{ status: "ACTIVE" }, { status: "SEPARATED", separationDate: { gte: start } }],
+    },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    include: {
+      paySettings: { orderBy: { effectiveFrom: "desc" } },
+      recurringItems: { orderBy: { effectiveFrom: "desc" } },
+    },
+  });
+}
+
 export function getEmployee(scope: Scope, companyId: string, id: string) {
   return scoped(scope).employee.findFirst({
     where: { id, companyId },

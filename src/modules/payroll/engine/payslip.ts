@@ -29,6 +29,7 @@ function deduction(
     rate: null,
     amount: round2(amount).toFixed(2),
     taxable: false,
+    isManual: false,
     note,
   };
 }
@@ -67,20 +68,27 @@ export function computePayslip(input: EngineInput): PayslipComputation {
   if (basic) earnings.push(basic);
   earnings.push(...computeHolidayPay(paySetting, policy, summary, rates));
   earnings.push(...computeOvertime(summary, policy, rates));
-  for (const r of input.recurring) {
-    if (r.kind !== "EARNING") continue;
-    earnings.push({
-      componentCode: r.componentCode,
-      label: r.label,
-      kind: "EARNING",
-      quantity: null,
-      unit: null,
-      rate: null,
-      amount: round2(money(r.amount)).toFixed(2),
-      taxable: byCode.get(r.componentCode)?.taxable ?? true,
-      note: null,
-    });
-  }
+  const manualEarning = (
+    r: { componentCode: string; label: string; amount: string },
+    isManual: boolean,
+    note: string | null,
+  ): PayslipLine => ({
+    componentCode: r.componentCode,
+    label: r.label,
+    kind: "EARNING",
+    quantity: null,
+    unit: null,
+    rate: null,
+    amount: round2(money(r.amount)).toFixed(2),
+    taxable: byCode.get(r.componentCode)?.taxable ?? true,
+    isManual,
+    note,
+  });
+  for (const r of input.recurring)
+    if (r.kind === "EARNING") earnings.push(manualEarning(r, false, null));
+  // Manual adjustments are stored with the period and re-merged on every recompute.
+  for (const a of input.adjustments)
+    if (a.kind === "EARNING") earnings.push(manualEarning(a, true, a.reason));
 
   // 2. Lates / undertime
   const deductions: PayslipLine[] = [];
@@ -198,10 +206,15 @@ export function computePayslip(input: EngineInput): PayslipComputation {
   // 5. Loans and other deductions
   const loans = applyLoans(input.loans, period);
   deductions.push(...loans.lines);
-  for (const r of input.recurring) {
-    if (r.kind !== "DEDUCTION") continue;
-    deductions.push(deduction(r.componentCode, r.label, money(r.amount)));
-  }
+  for (const r of input.recurring)
+    if (r.kind === "DEDUCTION")
+      deductions.push(deduction(r.componentCode, r.label, money(r.amount)));
+  for (const a of input.adjustments)
+    if (a.kind === "DEDUCTION")
+      deductions.push({
+        ...deduction(a.componentCode, a.label, money(a.amount), a.reason),
+        isManual: true,
+      });
 
   // 6. Totals
   const gross = sum(earnings);

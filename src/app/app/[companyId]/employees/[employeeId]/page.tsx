@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getScope, requireCompany } from "@/lib/session";
+import { roleCan } from "@/lib/permissions";
 import { isUuid } from "@/lib/request";
 import { toIsoDate } from "@/lib/dates";
 import { getEmployee, getEmployeeNoSeries, listDepartments } from "@/modules/employees/service";
@@ -16,7 +17,7 @@ export default async function EmployeeDetailsPage({
   params: Promise<{ companyId: string; employeeId: string }>;
 }) {
   const { companyId, employeeId } = await params;
-  const { company } = await requireCompany(companyId);
+  const { user, company } = await requireCompany(companyId);
   if (!isUuid(employeeId)) notFound();
   const scope = await getScope();
   const [employee, series, departments] = await Promise.all([
@@ -33,7 +34,12 @@ export default async function EmployeeDetailsPage({
         title={`${employee.lastName}, ${employee.firstName}`}
         description={employee.position ?? undefined}
       />
-      <EmployeeTabs companyId={companyId} employeeId={employeeId} active="details" />
+      <EmployeeTabs
+        companyId={companyId}
+        employeeId={employeeId}
+        active="details"
+        showLoans={roleCan(user.role, "loans.view")}
+      />
       <EmployeeForm
         mode="edit"
         companyId={companyId}

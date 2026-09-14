@@ -116,6 +116,7 @@ export default async function CompanySettingsPage({
                       nightDiffRate: latest.nightDiffRate.toString(),
                       statutoryTiming: latest.statutoryTiming,
                       lateGraceMinutes: latest.lateGraceMinutes,
+                      officerCanApprove: latest.officerCanApprove,
                     }
                   : null
               }

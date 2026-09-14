@@ -13,8 +13,8 @@ import {
 
 /**
  * Same daily-rate employee as daily-rate.test.ts (net before loans 7,462.83) with two loans:
- *   SSS loan      monthly amortization 1,200.00, balance 1,000.00 → 600.00 this cutoff (400.00 left)
- *   Pag-IBIG loan monthly amortization   500.00, balance   150.00 → 150.00 (capped at balance, final)
+ *   SSS loan      amortization 600.00 per period, balance 1,000.00 → 600.00 this cutoff (400.00 left)
+ *   Pag-IBIG loan amortization 250.00 per period, balance   150.00 → 150.00 (capped at balance, final)
  *
  * | Line              | Basis                                   |    Amount |
  * |-------------------|-----------------------------------------|----------:|
@@ -23,16 +23,16 @@ import {
  * | SSS               |                                         |    925.00 |
  * | Pag-IBIG          |                                         |    200.00 |
  * | PhilHealth        |                                         |    456.46 |
- * | SSS loan          | ½ × 1,200.00                            |    600.00 |
- * | Pag-IBIG loan     | min(½ × 500.00, balance 150.00)         |    150.00 |
+ * | SSS loan          | 600.00 per period                       |    600.00 |
+ * | Pag-IBIG loan     | min(250.00, balance 150.00)             |    150.00 |
  * | TOTAL DEDUCTIONS  |                                         |  2,411.67 |
  * | NET PAY           |                                         |  6,712.83 |
  */
 describe("worked example: employee with SSS loan", () => {
   const loans = [
-    { id: "L1", type: "SSS_LOAN" as const, monthlyAmortization: "1200.00", balance: "1000.00" },
-    { id: "L2", type: "PAGIBIG_LOAN" as const, monthlyAmortization: "500.00", balance: "150.00" },
-    { id: "L3", type: "CASH_ADVANCE" as const, monthlyAmortization: "300.00", balance: "0.00" },
+    { id: "L1", type: "SSS_LOAN" as const, amortization: "600.00", balance: "1000.00" },
+    { id: "L2", type: "PAGIBIG_LOAN" as const, amortization: "250.00", balance: "150.00" },
+    { id: "L3", type: "CASH_ADVANCE" as const, amortization: "300.00", balance: "0.00" },
   ];
   const input = {
     paySetting: paySetting({ payType: "DAILY", dailyRate: "700.00" }),
@@ -52,11 +52,12 @@ describe("worked example: employee with SSS loan", () => {
     tables: TABLES,
     components: COMPONENTS,
     recurring: [],
+    adjustments: [],
     loans,
   };
   const r = computePayslip(input);
 
-  it("amortizes half the monthly amount per cutoff, never beyond the balance", () => {
+  it("takes one amortization per period, never beyond the balance", () => {
     expect(amountOf(r, "SSS_LOAN")).toBe("600.00");
     expect(amountOf(r, "HDMF_LOAN")).toBe("150.00");
     expect(amountOf(r, "CASH_ADV")).toBe("0.00");
@@ -80,9 +81,10 @@ describe("worked example: employee with SSS loan", () => {
     expect(amountOf(first, "SSS_LOAN")).toBe("600.00");
   });
 
-  it("applyLoans on a monthly payroll takes the full amortization", () => {
+  it("applyLoans ignores the pay frequency (the record already holds the per-period amount)", () => {
     const { lines } = applyLoans(loans, { ...PERIOD_2ND, frequency: "MONTHLY" });
-    expect(lines.map((l) => l.amount)).toEqual(["1000.00", "150.00"]);
-    expect(lines[0]?.note).toBe("final payment"); // 1,200 capped at the 1,000 balance
+    expect(lines.map((l) => l.amount)).toEqual(["600.00", "150.00"]);
+    expect(lines[0]?.note).toBe("balance after: 400.00");
+    expect(lines.every((l) => l.isManual === false)).toBe(true);
   });
 });

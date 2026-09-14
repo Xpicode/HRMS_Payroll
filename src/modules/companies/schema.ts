@@ -77,6 +77,7 @@ export const policySchema = z.object({
   nightDiffRate: decimalText(0, 1),
   statutoryTiming: z.enum(StatutoryTiming),
   lateGraceMinutes: z.coerce.number().int().min(0).max(120),
+  officerCanApprove: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()),
 });
 export type PolicyInput = z.infer<typeof policySchema>;
 

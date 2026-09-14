@@ -149,7 +149,7 @@ describe("refused operations", () => {
 });
 
 describe("TENANT_MODELS", () => {
-  it("lists every Phase 0 model with a company_id", () => {
+  it("lists every model with a company_id", () => {
     expect(Object.keys(TENANT_MODELS).sort()).toEqual([
       "Company",
       "CompanyPayrollPolicy",
@@ -158,6 +158,12 @@ describe("TENANT_MODELS", () => {
       "EmployeePaySetting",
       "EmployeeRecurringItem",
       "Holiday",
+      "Loan",
+      "LoanPayment",
+      "PayPeriod",
+      "PayrollAdjustment",
+      "Payslip",
+      "PayslipLine",
       "UserCompany",
     ]);
   });

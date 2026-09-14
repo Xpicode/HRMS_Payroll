@@ -23,6 +23,7 @@ function earning(
     rate: extra.rate ?? null,
     amount: round2(amount).toFixed(2),
     taxable: true,
+    isManual: false,
     note: extra.note ?? null,
   };
 }
@@ -81,6 +82,7 @@ export function computeLateUndertime(summary: CutoffSummary, rates: Rates): Pays
     rate: rates.hourlyRate.toFixed(2),
     amount: round2(perMinute.times(minutes)).toFixed(2),
     taxable: false,
+    isManual: false,
     note: `${summary.lateMinutes} late + ${summary.undertimeMinutes} undertime min at ${formatMoney(rates.hourlyRate)}/h`,
   };
 }

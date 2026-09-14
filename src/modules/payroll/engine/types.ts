@@ -94,8 +94,18 @@ export type LoanInput = {
   id: string;
   type: LoanType;
   label?: string;
-  monthlyAmortization: Money;
+  /** Amount deducted per pay period (never more than the balance). */
+  amortization: Money;
   balance: Money;
+};
+
+/** A manual line entered by the payroll officer for this employee and period. */
+export type AdjustmentInput = {
+  componentCode: string;
+  kind: LineKind;
+  label: string;
+  amount: Money;
+  reason: string;
 };
 
 export type EnginePeriod = {
@@ -115,6 +125,8 @@ export type PayslipLine = {
   rate: Money | null;
   amount: Money;
   taxable: boolean;
+  /** true for lines that came from a manual adjustment. */
+  isManual: boolean;
   note: string | null;
 };
 
@@ -138,6 +150,7 @@ export type EngineInput = {
   tables: StatutoryTables;
   components: PayComponentDef[];
   recurring: RecurringItemInput[];
+  adjustments: AdjustmentInput[];
   loans: LoanInput[];
 };
 

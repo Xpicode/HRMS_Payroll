@@ -31,6 +31,7 @@ describe("worked example: employee at the SSS / PhilHealth ceilings", () => {
     tables: TABLES,
     components: COMPONENTS,
     recurring: [],
+    adjustments: [],
     loans: [],
   });
 

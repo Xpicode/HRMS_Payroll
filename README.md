@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 3** (foundation, employees, attendance incl. DTR card scanning, statutory tables, payroll engine and calculator).
+Status: **Phase 4** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans).
 
 ## Run locally from a fresh clone
 
@@ -45,6 +45,7 @@ pnpm dev                         # http://localhost:8080
 | `pnpm typecheck`                         | Prisma generate + Next typegen + `tsc --noEmit`           |
 | `pnpm lint` / `pnpm format`              | ESLint / Prettier                                         |
 | `pnpm test`                              | Vitest unit tests                                         |
+| `pnpm test:integration`                  | Lifecycle tests against the Postgres in `DATABASE_URL`    |
 | `pnpm db:migrate`                        | `prisma migrate dev` (creates + applies a migration)      |
 | `pnpm db:migrate:deploy`                 | Apply existing migrations (used by Docker)                |
 | `pnpm db:seed`                           | Idempotent seed: first admin + 2026 national holidays     |
@@ -145,9 +146,39 @@ docker/                  dev image + entrypoint
   summary, the pay setting and policy in force on the cutoff end, overlapping recurring items and the statutory
   tables → lines and totals in payslip order, plus basis, attendance and employer-share panels. Nothing is saved.
 
+## Pay periods, payslips and loans (Phase 4)
+
+- **Lifecycle** (Payroll → period): `DRAFT` → **Compute** → `COMPUTED` → **Approve** → `APPROVED` → **Release**
+  (on/after the pay date) → `RELEASED` → **Lock** → `LOCKED`. Every transition is audited. Periods are generated per
+  company cutoff (next one, or a chosen month/half) with an editable pay date.
+- **Compute** runs the engine for every employee hired by the coverage end who is ACTIVE (or separated inside the
+  period): attendance summary + pay setting and policy in force on the coverage end + recurring items + active loans
+  - manual adjustments → `payslips` + `payslip_lines`. Allowed any number of times while below APPROVED; employees who
+    drop out lose their payslip, manual adjustments are re-merged.
+- **Adjustments** (payslip page): a manual earning or deduction with a reason; saved in `payroll_adjustments` and that
+  employee alone is recomputed. Manual lines are marked on the payslip.
+- **Approve** assigns slip codes from the company counter (`prefix-NNN`, ordered by employee name, only to payslips
+  without one), freezes a `snapshot` on each payslip (employee, IDs, company header and signatory, pay setting, policy
+  version, statutory table versions, the full engine input and output, loan payments) and posts `loan_payments`,
+  decrementing balances. `PAYROLL_OFFICER` may approve unless the policy flag _Payroll officers may approve_ is off;
+  `ADMIN` always may.
+- **Immutability**: once a period is APPROVED, RELEASED or LOCKED the repo layer refuses every payslip/line write
+  (`ImmutablePayslipError`) and database triggers (`payslip_immutable`, `payslip_line_immutable`,
+  `pay_period_no_delete_when_frozen`) refuse them for any client. The only allowed write on a frozen payslip is its PDF
+  path (Phase 5). Changing an employee's rate afterwards changes nothing on the approved payslip.
+- **Revert** (ADMIN only, reason required, audited): APPROVED/RELEASED → COMPUTED, loan payments deleted and balances
+  restored, snapshots cleared; slip codes stay with their payslips and are reused on re-approval. LOCKED cannot be
+  reverted.
+- **Loans** (Employee → Loans): SSS loan, Pag-IBIG loan, cash advance or other, with principal, amortization **per pay
+  period**, start date and balance. Deducted from the first period whose coverage ends on/after the start date; never
+  more than the balance; a loan turns `PAID` at zero and can be `CANCELLED`. Balances move only on approve/revert.
+- **Tests**: `pnpm test` covers the engine and schemas; `pnpm test:integration` runs the whole lifecycle (compute →
+  adjust → recompute → approve → edits refused by service and trigger → rate change → revert → re-approve → release →
+  lock) against the real database with a throw-away company.
+
 ## Conventions worth knowing
 
 - Money and rates are `Decimal` in the database and strings/`decimal.js` in code — never JS numbers.
 - Calendar dates are `date` columns; use `toDateOnly` / `toIsoDate` from `src/lib/dates.ts`. Timezone is Asia/Manila.
 - Statutory tables and multipliers are data with effective dates, never constants in code.
-- Approved payslips (Phase 4+) are immutable snapshots.
+- Approved payslips are immutable snapshots (repo guard + database triggers).

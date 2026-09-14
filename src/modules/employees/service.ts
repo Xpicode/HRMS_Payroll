@@ -76,6 +76,18 @@ export async function getEmployee(scope: Scope, companyId: string, id: string) {
   return repo.getEmployee(scope, companyId, id);
 }
 
+/** Employees to pay for a period, with pay-setting history and recurring items (payroll module). */
+export async function listEmployeesForPayroll(
+  scope: Scope,
+  companyId: string,
+  start: string,
+  end: string,
+) {
+  assertPermission(scope, "employees.view");
+  assertCompanyAccess(scope, companyId);
+  return repo.listForPayroll(scope, companyId, toDateOnly(start), toDateOnly(end));
+}
+
 export async function listDepartments(scope: Scope, companyId: string) {
   assertCompanyAccess(scope, companyId);
   return repo.listDepartments(scope, companyId);

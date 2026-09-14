@@ -47,6 +47,7 @@ const eslintConfig = defineConfig([
       "src/lib/session.ts",
       "prisma/**/*.ts",
       "src/app/api/**/*.ts",
+      "tests/**/*.ts",
     ],
     rules: { "no-restricted-imports": "off" },
   },

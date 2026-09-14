@@ -43,8 +43,10 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  companies UserCompany[]
-  auditLogs AuditLog[]
+  companies       UserCompany[]
+  auditLogs       AuditLog[]
+  approvedPeriods PayPeriod[]         @relation("PayPeriodApprovedBy")
+  adjustments     PayrollAdjustment[]
 
   @@map("users")
 }
@@ -78,37 +80,40 @@ enum StatutoryTiming {
 }
 
 model Company {
-  id                  String       @id @default(uuid(7)) @db.Uuid
-  code                String       @unique
-  legalName           String       @map("legal_name")
-  tradeName           String?      @map("trade_name")
-  address             String
-  tin                 String?
-  sssEmployerNo       String?      @map("sss_employer_no")
-  philhealthEmployerNo String?     @map("philhealth_employer_no")
-  pagibigEmployerNo   String?      @map("pagibig_employer_no")
-  logoPath            String?      @map("logo_path")
-  payFrequency        PayFrequency @default(SEMI_MONTHLY) @map("pay_frequency")
-  signatoryName       String       @map("signatory_name")
-  signatoryTitle      String       @map("signatory_title")
-  slipCodePrefix      String       @map("slip_code_prefix")
-  slipCodeNext        Int          @default(1) @map("slip_code_next")
-  slipCodePad         Int          @default(3) @map("slip_code_pad")
-  employeeNoPrefix    String       @default("EMP") @map("employee_no_prefix")
-  employeeNoNext      Int          @default(1) @map("employee_no_next")
-  employeeNoPad       Int          @default(4) @map("employee_no_pad")
-  isActive            Boolean      @default(true) @map("is_active")
-  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                   String       @id @default(uuid(7)) @db.Uuid
+  code                 String       @unique
+  legalName            String       @map("legal_name")
+  tradeName            String?      @map("trade_name")
+  address              String
+  tin                  String?
+  sssEmployerNo        String?      @map("sss_employer_no")
+  philhealthEmployerNo String?      @map("philhealth_employer_no")
+  pagibigEmployerNo    String?      @map("pagibig_employer_no")
+  logoPath             String?      @map("logo_path")
+  payFrequency         PayFrequency @default(SEMI_MONTHLY) @map("pay_frequency")
+  signatoryName        String       @map("signatory_name")
+  signatoryTitle       String       @map("signatory_title")
+  slipCodePrefix       String       @map("slip_code_prefix")
+  slipCodeNext         Int          @default(1) @map("slip_code_next")
+  slipCodePad          Int          @default(3) @map("slip_code_pad")
+  employeeNoPrefix     String       @default("EMP") @map("employee_no_prefix")
+  employeeNoNext       Int          @default(1) @map("employee_no_next")
+  employeeNoPad        Int          @default(4) @map("employee_no_pad")
+  isActive             Boolean      @default(true) @map("is_active")
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  users     UserCompany[]
-  policies  CompanyPayrollPolicy[]
-  holidays  Holiday[]
-  auditLogs AuditLog[]
+  users          UserCompany[]
+  policies       CompanyPayrollPolicy[]
+  holidays       Holiday[]
+  auditLogs      AuditLog[]
   employees      Employee[]
   paySettings    EmployeePaySetting[]
   recurringItems EmployeeRecurringItem[]
   timeRecords    DailyTimeRecord[]
+  payPeriods     PayPeriod[]
+  payslips       Payslip[]
+  loans          Loan[]
 
   @@map("companies")
 }
@@ -116,21 +121,23 @@ model Company {
 /// One row per company per effective date. The engine picks the latest row
 /// whose effective_from <= the pay period's coverage_end.
 model CompanyPayrollPolicy {
-  id                      String          @id @default(uuid(7)) @db.Uuid
-  companyId               String          @map("company_id") @db.Uuid
-  effectiveFrom           DateTime        @map("effective_from") @db.Date
-  workingDaysPerYear      Int             @default(313) @map("working_days_per_year")
-  hoursPerDay             Decimal         @default(8) @map("hours_per_day") @db.Decimal(4, 2)
-  otRegular               Decimal         @default(1.25) @map("ot_regular") @db.Decimal(6, 4)
-  otRestDay               Decimal         @default(1.30) @map("ot_rest_day") @db.Decimal(6, 4)
-  otRestDayExcess         Decimal         @default(1.69) @map("ot_rest_day_excess") @db.Decimal(6, 4)
-  otRegularHoliday        Decimal         @default(2.00) @map("ot_regular_holiday") @db.Decimal(6, 4)
-  otRegularHolidayExcess  Decimal         @default(2.60) @map("ot_regular_holiday_excess") @db.Decimal(6, 4)
-  nightDiffRate           Decimal         @default(0.10) @map("night_diff_rate") @db.Decimal(6, 4)
-  statutoryTiming         StatutoryTiming @default(SECOND_CUTOFF) @map("statutory_timing")
-  lateGraceMinutes        Int             @default(0) @map("late_grace_minutes")
-  createdAt               DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt               DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                     String          @id @default(uuid(7)) @db.Uuid
+  companyId              String          @map("company_id") @db.Uuid
+  effectiveFrom          DateTime        @map("effective_from") @db.Date
+  workingDaysPerYear     Int             @default(313) @map("working_days_per_year")
+  hoursPerDay            Decimal         @default(8) @map("hours_per_day") @db.Decimal(4, 2)
+  otRegular              Decimal         @default(1.25) @map("ot_regular") @db.Decimal(6, 4)
+  otRestDay              Decimal         @default(1.30) @map("ot_rest_day") @db.Decimal(6, 4)
+  otRestDayExcess        Decimal         @default(1.69) @map("ot_rest_day_excess") @db.Decimal(6, 4)
+  otRegularHoliday       Decimal         @default(2.00) @map("ot_regular_holiday") @db.Decimal(6, 4)
+  otRegularHolidayExcess Decimal         @default(2.60) @map("ot_regular_holiday_excess") @db.Decimal(6, 4)
+  nightDiffRate          Decimal         @default(0.10) @map("night_diff_rate") @db.Decimal(6, 4)
+  statutoryTiming        StatutoryTiming @default(SECOND_CUTOFF) @map("statutory_timing")
+  /// When false only an ADMIN may approve, release or lock a pay period.
+  officerCanApprove      Boolean         @default(true) @map("officer_can_approve")
+  lateGraceMinutes       Int             @default(0) @map("late_grace_minutes")
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -251,6 +258,9 @@ model Employee {
   paySettings    EmployeePaySetting[]
   recurringItems EmployeeRecurringItem[]
   timeRecords    DailyTimeRecord[]
+  payslips       Payslip[]
+  adjustments    PayrollAdjustment[]
+  loans          Loan[]
 
   @@unique([companyId, employeeNo])
   @@index([companyId, status])
@@ -440,4 +450,190 @@ model PayComponent {
   isSystem Boolean          @default(false) @map("is_system")
 
   @@map("pay_components")
+}
+
+// ---------------------------------------------------------------------------
+// Pay periods, payslips, adjustments, loans — Phase 4
+// ---------------------------------------------------------------------------
+
+enum PayPeriodStatus {
+  DRAFT
+  COMPUTED
+  APPROVED
+  RELEASED
+  LOCKED
+}
+
+/// One payroll run for a company cutoff. Status drives what may change: payslips and lines
+/// are immutable once APPROVED (repo guard + database trigger, see the migration).
+model PayPeriod {
+  id              String          @id @default(uuid(7)) @db.Uuid
+  companyId       String          @map("company_id") @db.Uuid
+  coverageStart   DateTime        @map("coverage_start") @db.Date
+  coverageEnd     DateTime        @map("coverage_end") @db.Date
+  payDate         DateTime        @map("pay_date") @db.Date
+  frequency       PayFrequency
+  sequenceInMonth Int             @map("sequence_in_month")
+  status          PayPeriodStatus @default(DRAFT)
+  computedAt      DateTime?       @map("computed_at") @db.Timestamptz(3)
+  approvedById    String?         @map("approved_by") @db.Uuid
+  approvedAt      DateTime?       @map("approved_at") @db.Timestamptz(3)
+  releasedAt      DateTime?       @map("released_at") @db.Timestamptz(3)
+  lockedAt        DateTime?       @map("locked_at") @db.Timestamptz(3)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  approvedBy   User?               @relation("PayPeriodApprovedBy", fields: [approvedById], references: [id])
+  payslips     Payslip[]
+  adjustments  PayrollAdjustment[]
+  loanPayments LoanPayment[]
+
+  @@unique([companyId, coverageStart])
+  @@index([companyId, status])
+  @@map("pay_periods")
+}
+
+/// One employee's pay for a period. `snapshot` is filled on approval and is the only source
+/// for PDFs and reports from then on; totals are copied out for listing.
+model Payslip {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  payPeriodId     String    @map("pay_period_id") @db.Uuid
+  employeeId      String    @map("employee_id") @db.Uuid
+  slipCode        String?   @map("slip_code")
+  snapshot        Json?
+  daysWorked      Decimal   @default(0) @map("days_worked") @db.Decimal(5, 2)
+  otHours         Decimal   @default(0) @map("ot_hours") @db.Decimal(6, 2)
+  grossPay        Decimal   @map("gross_pay") @db.Decimal(12, 2)
+  totalDeductions Decimal   @map("total_deductions") @db.Decimal(12, 2)
+  netPay          Decimal   @map("net_pay") @db.Decimal(12, 2)
+  taxableIncome   Decimal   @default(0) @map("taxable_income") @db.Decimal(12, 2)
+  /// Engine flags (code + message) for the review table.
+  flags           Json      @default("[]")
+  /// The engine's full input and output for the last computation (working copy before approval).
+  computation     Json
+  pdfPath         String?   @map("pdf_path")
+  generatedAt     DateTime? @map("generated_at") @db.Timestamptz(3)
+  computedAt      DateTime  @default(now()) @map("computed_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payPeriod    PayPeriod     @relation(fields: [payPeriodId], references: [id], onDelete: Cascade)
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  lines        PayslipLine[]
+  loanPayments LoanPayment[]
+
+  @@unique([payPeriodId, employeeId])
+  @@unique([companyId, slipCode])
+  @@index([companyId, employeeId])
+  @@map("payslips")
+}
+
+model PayslipLine {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  companyId     String           @map("company_id") @db.Uuid
+  payslipId     String           @map("payslip_id") @db.Uuid
+  componentCode String           @map("component_code")
+  label         String
+  kind          PayComponentKind
+  quantity      Decimal?         @db.Decimal(10, 2)
+  unit          String?
+  rate          Decimal?         @db.Decimal(12, 4)
+  amount        Decimal          @db.Decimal(12, 2)
+  taxable       Boolean          @default(false)
+  isManual      Boolean          @default(false) @map("is_manual")
+  note          String?
+  /// Position on the payslip (component order, then insertion).
+  order         Int
+
+  payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@index([payslipId])
+  @@index([companyId])
+  @@map("payslip_lines")
+}
+
+/// A manual earning or deduction for one employee in one period. Merged by the engine on
+/// every (re)compute so it survives recomputation; deleted with the period.
+model PayrollAdjustment {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  companyId     String           @map("company_id") @db.Uuid
+  payPeriodId   String           @map("pay_period_id") @db.Uuid
+  employeeId    String           @map("employee_id") @db.Uuid
+  componentCode String           @map("component_code")
+  kind          PayComponentKind
+  label         String
+  amount        Decimal          @db.Decimal(12, 2)
+  reason        String
+  createdById   String?          @map("created_by") @db.Uuid
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  payPeriod PayPeriod @relation(fields: [payPeriodId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation(fields: [createdById], references: [id])
+
+  @@index([payPeriodId, employeeId])
+  @@index([companyId])
+  @@map("payroll_adjustments")
+}
+
+enum LoanType {
+  SSS_LOAN
+  PAGIBIG_LOAN
+  CASH_ADVANCE
+  OTHER
+}
+
+enum LoanStatus {
+  ACTIVE
+  PAID
+  CANCELLED
+}
+
+/// Employee loan or cash advance. `amortization` is deducted per pay period starting with the
+/// first period whose coverage ends on/after `startDate`; deductions stop at zero balance.
+model Loan {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  companyId    String     @map("company_id") @db.Uuid
+  employeeId   String     @map("employee_id") @db.Uuid
+  type         LoanType
+  label        String
+  principal    Decimal    @db.Decimal(12, 2)
+  amortization Decimal    @db.Decimal(12, 2)
+  startDate    DateTime   @map("start_date") @db.Date
+  balance      Decimal    @db.Decimal(12, 2)
+  status       LoanStatus @default(ACTIVE)
+  note         String?
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payments LoanPayment[]
+
+  @@index([employeeId, status])
+  @@index([companyId, status])
+  @@map("loans")
+}
+
+/// Posted when a period is approved; deleted (and the balance restored) when it is reverted.
+model LoanPayment {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  loanId       String   @map("loan_id") @db.Uuid
+  payslipId    String   @map("payslip_id") @db.Uuid
+  payPeriodId  String   @map("pay_period_id") @db.Uuid
+  amount       Decimal  @db.Decimal(12, 2)
+  balanceAfter Decimal  @map("balance_after") @db.Decimal(12, 2)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  loan      Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  payslip   Payslip   @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  payPeriod PayPeriod @relation(fields: [payPeriodId], references: [id], onDelete: Cascade)
+
+  @@unique([loanId, payslipId])
+  @@index([companyId])
+  @@map("loan_payments")
 }

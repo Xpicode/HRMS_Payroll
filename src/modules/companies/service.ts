@@ -21,6 +21,7 @@ export const DEFAULT_POLICY: Omit<repo.PolicyData, "effectiveFrom"> = {
   nightDiffRate: "0.10",
   statutoryTiming: "SECOND_CUTOFF",
   lateGraceMinutes: 0,
+  officerCanApprove: true,
 };
 
 function isUniqueViolation(e: unknown): e is Prisma.PrismaClientKnownRequestError {

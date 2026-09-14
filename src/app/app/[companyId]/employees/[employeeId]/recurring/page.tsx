@@ -51,7 +51,12 @@ export default async function RecurringItemsPage({
         title={`${employee.lastName}, ${employee.firstName}`}
         description={employee.position ?? undefined}
       />
-      <EmployeeTabs companyId={companyId} employeeId={employeeId} active="recurring" />
+      <EmployeeTabs
+        companyId={companyId}
+        employeeId={employeeId}
+        active="recurring"
+        showLoans={roleCan(user.role, "loans.view")}
+      />
 
       {sp.saved || sp.deleted ? (
         <Alert className="mb-6 border-success/30 bg-success/5 text-success">
@@ -64,8 +69,7 @@ export default async function RecurringItemsPage({
           <CardHeader>
             <CardTitle>Fixed allowances and deductions</CardTitle>
             <CardDescription>
-              Applied every pay period while in effect. Payroll (Phase 4) reads these when
-              computing.
+              Applied every pay period while in effect; the payroll compute reads them.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">

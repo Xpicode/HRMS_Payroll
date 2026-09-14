@@ -40,6 +40,7 @@ describe("worked example: monthly employee", () => {
     recurring: [
       { componentCode: "ALLOWANCE", kind: "EARNING", label: "Allowance", amount: "1000.00" },
     ],
+    adjustments: [],
     loans: [],
   });
 
@@ -95,6 +96,7 @@ describe("worked example: monthly employee", () => {
       tables: TABLES,
       components: COMPONENTS,
       recurring: [],
+      adjustments: [],
       loans: [],
     });
     // 17,500.00 − 2 × 1,341.85

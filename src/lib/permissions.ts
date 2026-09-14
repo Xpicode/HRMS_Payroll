@@ -19,7 +19,13 @@ export const PERMISSIONS = {
   "attendance.view": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
   "attendance.manage": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
   "attendance.import": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
+  "payroll.view": ["ADMIN", "PAYROLL_OFFICER"],
   "payroll.compute": ["ADMIN", "PAYROLL_OFFICER"],
+  /** Also subject to the policy flag officerCanApprove for PAYROLL_OFFICER. */
+  "payroll.approve": ["ADMIN", "PAYROLL_OFFICER"],
+  "payroll.revert": ["ADMIN"],
+  "loans.view": ["ADMIN", "PAYROLL_OFFICER"],
+  "loans.manage": ["ADMIN", "PAYROLL_OFFICER"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

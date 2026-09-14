@@ -43,6 +43,7 @@ describe("worked example: daily-rate employee", () => {
     tables: TABLES,
     components: COMPONENTS,
     recurring: [],
+    adjustments: [],
     loans: [],
   };
   const r = computePayslip(input);

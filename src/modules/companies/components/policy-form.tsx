@@ -23,6 +23,7 @@ export type PolicyFormValues = {
   nightDiffRate: string;
   statutoryTiming: StatutoryTiming;
   lateGraceMinutes: number;
+  officerCanApprove: boolean;
 };
 
 const FALLBACK: PolicyFormValues = {
@@ -37,6 +38,7 @@ const FALLBACK: PolicyFormValues = {
   nightDiffRate: "0.10",
   statutoryTiming: "SECOND_CUTOFF",
   lateGraceMinutes: 0,
+  officerCanApprove: true,
 };
 
 export function PolicyForm({
@@ -217,6 +219,23 @@ export function PolicyForm({
             defaultValue={d.lateGraceMinutes}
             className="tabular"
           />
+        </Field>
+        <Field
+          label="Approvals"
+          name="officerCanApprove"
+          error={errors?.officerCanApprove}
+          hint="Unticked: only an administrator may approve, release or lock pay periods"
+        >
+          <label className="flex h-8 items-center gap-2 text-sm">
+            <input
+              id="officerCanApprove"
+              name="officerCanApprove"
+              type="checkbox"
+              defaultChecked={d.officerCanApprove}
+              className="size-4"
+            />
+            Payroll officers may approve
+          </label>
         </Field>
       </FieldGrid>
 

@@ -40,6 +40,7 @@ export type PolicyData = {
   nightDiffRate: string;
   statutoryTiming: StatutoryTiming;
   lateGraceMinutes: number;
+  officerCanApprove: boolean;
 };
 
 export type HolidayData = {

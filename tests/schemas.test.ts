@@ -57,6 +57,8 @@ describe("policySchema", () => {
       lateGraceMinutes: "5",
     });
     expect(r.otRegular).toBe("1.25");
+    expect(r.officerCanApprove).toBe(false); // unticked checkbox is absent from the form
+    expect(policySchema.parse({ ...r, officerCanApprove: "on" }).officerCanApprove).toBe(true);
     expect(typeof r.otRegular).toBe("string");
     expect(r.lateGraceMinutes).toBe(5);
   });

@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
+    // integration tests need a database: `pnpm test:integration`
+    exclude: ["tests/integration/**", "node_modules/**"],
     env: {
       TZ: "UTC",
     },

@@ -34,6 +34,7 @@ describe("worked example: minimum-wage earner", () => {
     tables: TABLES,
     components: COMPONENTS,
     recurring: [],
+    adjustments: [],
     loans: [],
   });
 
