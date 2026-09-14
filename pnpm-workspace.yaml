@@ -1,0 +1,9 @@
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
+  "@prisma/engines": true
+  prisma: true
+  "@prisma/client": true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - zod@4.6.5

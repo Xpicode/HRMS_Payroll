@@ -1,0 +1,180 @@
+// HRMS + Payroll — Phase 0 schema (auth, companies, holidays, audit).
+// Later phases append models; never delete or rename applied migrations.
+//
+// Conventions
+// - Every tenant table carries `companyId` (column company_id). Queries on tenant
+//   tables go through src/lib/scope.ts.
+// - Dates that are calendar dates (holidays, effective dates) are `@db.Date`.
+// - Timestamps are `timestamptz`. Timezone handling lives in src/lib/dates.ts.
+// - Money and rates are `Decimal` — never Float.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// auth
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  PAYROLL_OFFICER
+  ENCODER
+}
+
+model User {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  email              String    @unique
+  name               String
+  passwordHash       String    @map("password_hash")
+  role               Role      @default(ENCODER)
+  isActive           Boolean   @default(true) @map("is_active")
+  // security
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  failedLoginCount   Int       @default(0) @map("failed_login_count")
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz(3)
+  passwordChangedAt  DateTime  @default(now()) @map("password_changed_at") @db.Timestamptz(3)
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  companies UserCompany[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model UserCompany {
+  userId    String   @map("user_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([userId, companyId])
+  @@index([companyId])
+  @@map("user_companies")
+}
+
+// ---------------------------------------------------------------------------
+// companies
+// ---------------------------------------------------------------------------
+
+enum PayFrequency {
+  SEMI_MONTHLY
+  MONTHLY
+}
+
+enum StatutoryTiming {
+  FIRST_CUTOFF
+  SECOND_CUTOFF
+  SPLIT
+}
+
+model Company {
+  id                  String       @id @default(uuid(7)) @db.Uuid
+  code                String       @unique
+  legalName           String       @map("legal_name")
+  tradeName           String?      @map("trade_name")
+  address             String
+  tin                 String?
+  sssEmployerNo       String?      @map("sss_employer_no")
+  philhealthEmployerNo String?     @map("philhealth_employer_no")
+  pagibigEmployerNo   String?      @map("pagibig_employer_no")
+  logoPath            String?      @map("logo_path")
+  payFrequency        PayFrequency @default(SEMI_MONTHLY) @map("pay_frequency")
+  signatoryName       String       @map("signatory_name")
+  signatoryTitle      String       @map("signatory_title")
+  slipCodePrefix      String       @map("slip_code_prefix")
+  slipCodeNext        Int          @default(1) @map("slip_code_next")
+  slipCodePad         Int          @default(3) @map("slip_code_pad")
+  isActive            Boolean      @default(true) @map("is_active")
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  users     UserCompany[]
+  policies  CompanyPayrollPolicy[]
+  holidays  Holiday[]
+  auditLogs AuditLog[]
+
+  @@map("companies")
+}
+
+/// One row per company per effective date. The engine picks the latest row
+/// whose effective_from <= the pay period's coverage_end.
+model CompanyPayrollPolicy {
+  id                      String          @id @default(uuid(7)) @db.Uuid
+  companyId               String          @map("company_id") @db.Uuid
+  effectiveFrom           DateTime        @map("effective_from") @db.Date
+  workingDaysPerYear      Int             @default(313) @map("working_days_per_year")
+  hoursPerDay             Decimal         @default(8) @map("hours_per_day") @db.Decimal(4, 2)
+  otRegular               Decimal         @default(1.25) @map("ot_regular") @db.Decimal(6, 4)
+  otRestDay               Decimal         @default(1.30) @map("ot_rest_day") @db.Decimal(6, 4)
+  otRestDayExcess         Decimal         @default(1.69) @map("ot_rest_day_excess") @db.Decimal(6, 4)
+  otRegularHoliday        Decimal         @default(2.00) @map("ot_regular_holiday") @db.Decimal(6, 4)
+  otRegularHolidayExcess  Decimal         @default(2.60) @map("ot_regular_holiday_excess") @db.Decimal(6, 4)
+  nightDiffRate           Decimal         @default(0.10) @map("night_diff_rate") @db.Decimal(6, 4)
+  statutoryTiming         StatutoryTiming @default(SECOND_CUTOFF) @map("statutory_timing")
+  lateGraceMinutes        Int             @default(0) @map("late_grace_minutes")
+  createdAt               DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, effectiveFrom])
+  @@map("company_payroll_policies")
+}
+
+enum HolidayType {
+  REGULAR
+  SPECIAL_NON_WORKING
+  SPECIAL_WORKING
+}
+
+/// companyId NULL = national holiday visible to every company.
+model Holiday {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  companyId String?     @map("company_id") @db.Uuid
+  date      DateTime    @db.Date
+  name      String
+  type      HolidayType
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, date])
+  @@index([date])
+  @@map("holidays")
+}
+
+// ---------------------------------------------------------------------------
+// audit — append-only. The application never updates or deletes rows here.
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  entity    String
+  entityId  String   @map("entity_id")
+  action    String
+  before    Json?
+  after     Json?
+  ip        String?
+  at        DateTime @default(now()) @db.Timestamptz(3)
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([companyId, at])
+  @@index([userId, at])
+  @@map("audit_logs")
+}
