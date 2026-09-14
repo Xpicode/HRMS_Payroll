@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 0** (foundation: auth, users, companies, holidays, scoping, audit log).
+Status: **Phase 1** (Phase 0 foundation + employees: 201 records, effective-dated pay settings, recurring items, CSV import).
 
 ## Run locally from a fresh clone
 
@@ -58,10 +58,10 @@ src/app/                 routes (thin; call module actions/services)
   (auth)/login
   app/                   everything behind login
     (global)/companies, users, account   admin + account screens
-    [companyId]/         dashboard, holidays, settings (company-scoped)
+    [companyId]/         dashboard, employees (list, 201 form, pay settings, recurring items, CSV import), holidays, settings
   api/auth, api/files    Auth.js handlers, scoped file serving
 src/modules/<feature>/   schema.ts (Zod) · service.ts (rules) · repo.ts (scoped Prisma) · actions.ts · components/
-src/lib/                 db, scope, session, audit, env, dates, password, rate-limit, storage
+src/lib/                 db, scope, session, audit, env, dates, money, csv, password, rate-limit, storage
 prisma/                  schema, migrations, seed/
 tests/                   Vitest
 docker/                  dev image + entrypoint
@@ -81,6 +81,18 @@ docker/                  dev image + entrypoint
 - **Headers**: CSP, HSTS (prod), `X-Frame-Options: DENY`, `nosniff`, referrer and permissions policies (`next.config.ts`).
 - **Audit**: append-only `audit_logs` with actor, ip, before/after (secrets redacted). No update/delete path exists in the app.
 - **Secrets**: only in `.env` (git-ignored). `.env.example` documents every variable.
+
+## Employees (Phase 1)
+
+- **Employee numbers** come from a per-company series (prefix + counter + digits, editable in Company settings). Leave the
+  number blank to auto-assign; a typed number is used as-is and must be unique in the company.
+- **Government IDs** are stored as digits only. SSS (10), PhilHealth (12), Pag-IBIG MID (12) and TIN (9–12) lengths are
+  checked as warnings: the form asks for confirmation instead of blocking, because real records carry odd numbers.
+- **Pay settings** are effective-dated history; rows are never edited. The row in force on a date is the latest one on or
+  before it. Daily/hourly rates for monthly employees are derived from the company policy (working days per year, hours per day).
+- **Recurring items** are fixed allowances/deductions with an effective range; codes match the Phase 3 pay components.
+- **CSV import**: Employees → Import CSV → download the template → upload → review the preview (errors block, warnings do
+  not) → import. All-or-nothing; each employee is created with an initial pay setting and audited.
 
 ## Conventions worth knowing
 
