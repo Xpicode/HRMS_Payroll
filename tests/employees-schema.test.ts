@@ -70,6 +70,10 @@ describe("paySettingSchema", () => {
     philhealthCovered: "on",
     pagibigCovered: "on",
     taxWithheld: "on",
+    restDayOfWeek: "0",
+    shiftStart: "08:00",
+    shiftEnd: "17:00",
+    breakMinutes: "60",
   };
   it("requires the rate matching the pay type", () => {
     expect(paySettingSchema.safeParse(pay).success).toBe(true);

@@ -29,6 +29,7 @@ const govId = z.preprocess(
 );
 
 const moneyText = z.string().trim().regex(MONEY_RE, "Enter an amount like 645.00");
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const optionalMoney = z.preprocess(blankToNull, moneyText.nullable());
 
 // ---------------------------------------------------------------------------
@@ -165,6 +166,10 @@ export const paySettingSchema = z
     philhealthCovered: checkbox,
     pagibigCovered: checkbox,
     taxWithheld: checkbox,
+    restDayOfWeek: z.coerce.number().int().min(0).max(6).default(0),
+    shiftStart: z.string().trim().regex(HHMM, "Use HH:MM"),
+    shiftEnd: z.string().trim().regex(HHMM, "Use HH:MM"),
+    breakMinutes: z.coerce.number().int().min(0).max(240),
     note: optionalText(200),
   })
   .superRefine((d, ctx) => {
@@ -264,6 +269,10 @@ export const CSV_COLUMNS = [
   { key: "philhealth_covered", required: false, hint: "Y/N (default Y)" },
   { key: "pagibig_covered", required: false, hint: "Y/N (default Y)" },
   { key: "tax_withheld", required: false, hint: "Y/N (default Y)" },
+  { key: "rest_day_of_week", required: false, hint: "0=Sun … 6=Sat (default 0)" },
+  { key: "shift_start", required: false, hint: "HH:MM (default 08:00)" },
+  { key: "shift_end", required: false, hint: "HH:MM (default 17:00)" },
+  { key: "break_minutes", required: false, hint: "Unpaid break (default 60)" },
   { key: "note", required: false, hint: "" },
 ] as const;
 
@@ -299,6 +308,10 @@ export const CSV_EXAMPLE_ROW: Record<CsvColumnKey, string> = {
   philhealth_covered: "Y",
   pagibig_covered: "Y",
   tax_withheld: "Y",
+  rest_day_of_week: "0",
+  shift_start: "08:00",
+  shift_end: "17:00",
+  break_minutes: "60",
   note: "",
 };
 
@@ -356,6 +369,10 @@ export function csvRowToInputs(
     philhealthCovered: bool("philhealth_covered", true),
     pagibigCovered: bool("pagibig_covered", true),
     taxWithheld: bool("tax_withheld", true),
+    restDayOfWeek: (row.rest_day_of_week ?? "").trim() || "0",
+    shiftStart: (row.shift_start ?? "").trim() || "08:00",
+    shiftEnd: (row.shift_end ?? "").trim() || "17:00",
+    breakMinutes: (row.break_minutes ?? "").trim() || "60",
     note: row.note ?? "",
   };
   return { employee, pay, errors };

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getScope, requireCompany } from "@/lib/session";
 import { roleCan } from "@/lib/permissions";
 import { isUuid } from "@/lib/request";
-import { formatDateOnly, toIsoDate, todayInManila } from "@/lib/dates";
+import { formatDateOnly, toIsoDate, todayInManila, WEEKDAY_SHORT } from "@/lib/dates";
 import { dailyFromMonthly, formatMoney, hourlyFromDaily } from "@/lib/money";
 import { getEmployee, getRateContext } from "@/modules/employees/service";
 import { PAY_TYPE_LABELS } from "@/modules/employees/schema";
@@ -88,6 +88,7 @@ export default async function PaySettingsPage({
                   <TableHead className="text-right">Daily</TableHead>
                   <TableHead className="text-right">Hourly</TableHead>
                   <TableHead>Frequency</TableHead>
+                  <TableHead>Schedule</TableHead>
                   <TableHead>Coverage</TableHead>
                   <TableHead>Note</TableHead>
                 </TableRow>
@@ -95,7 +96,7 @@ export default async function PaySettingsPage({
               <TableBody>
                 {employee.paySettings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                       No pay setting yet.
                     </TableCell>
                   </TableRow>
@@ -132,6 +133,9 @@ export default async function PaySettingsPage({
                         <TableCell className="text-right tabular">{formatMoney(hourly)}</TableCell>
                         <TableCell className="text-sm">
                           {PAY_FREQUENCY_LABELS[p.payFrequency]}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground tabular">
+                          {p.shiftStart}–{p.shiftEnd} · rest {WEEKDAY_SHORT[p.restDayOfWeek] ?? "?"}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {[
@@ -184,6 +188,10 @@ export default async function PaySettingsPage({
                         philhealthCovered: latest.philhealthCovered,
                         pagibigCovered: latest.pagibigCovered,
                         taxWithheld: latest.taxWithheld,
+                        restDayOfWeek: latest.restDayOfWeek,
+                        shiftStart: latest.shiftStart,
+                        shiftEnd: latest.shiftEnd,
+                        breakMinutes: latest.breakMinutes,
                       }
                     : null
                 }

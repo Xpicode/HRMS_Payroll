@@ -11,6 +11,7 @@ import { initialActionState } from "@/lib/action-result";
 import { PayFrequency, PayType } from "@/generated/prisma/enums";
 import { dailyFromMonthly, formatMoney, hourlyFromDaily, isMoneyString } from "@/lib/money";
 import { PAY_FREQUENCY_LABELS } from "@/modules/companies/schema";
+import { WEEKDAY_LABELS } from "@/lib/dates";
 import { PAY_TYPE_LABELS } from "../schema";
 import { addPaySettingAction } from "../actions";
 
@@ -32,6 +33,10 @@ type Props = {
     philhealthCovered: boolean;
     pagibigCovered: boolean;
     taxWithheld: boolean;
+    restDayOfWeek: number;
+    shiftStart: string;
+    shiftEnd: string;
+    breakMinutes: number;
   } | null;
 };
 
@@ -151,6 +156,61 @@ export function PaySettingForm(p: Props) {
           <Input id="note" name="note" placeholder="e.g. regularisation" maxLength={200} />
         </Field>
       </FieldGrid>
+
+      <div>
+        <p className="mb-3 text-sm font-medium">Schedule</p>
+        <FieldGrid className="sm:grid-cols-4">
+          <Field label="Rest day" name="restDayOfWeek" error={errors?.restDayOfWeek} required>
+            <NativeSelect
+              id="restDayOfWeek"
+              name="restDayOfWeek"
+              defaultValue={String(p.latest?.restDayOfWeek ?? 0)}
+            >
+              {WEEKDAY_LABELS.map((d, i) => (
+                <option key={d} value={i}>
+                  {d}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Shift start" name="shiftStart" error={errors?.shiftStart} required>
+            <Input
+              id="shiftStart"
+              name="shiftStart"
+              type="time"
+              defaultValue={p.latest?.shiftStart ?? "08:00"}
+              required
+            />
+          </Field>
+          <Field label="Shift end" name="shiftEnd" error={errors?.shiftEnd} required>
+            <Input
+              id="shiftEnd"
+              name="shiftEnd"
+              type="time"
+              defaultValue={p.latest?.shiftEnd ?? "17:00"}
+              required
+            />
+          </Field>
+          <Field
+            label="Unpaid break (min)"
+            name="breakMinutes"
+            error={errors?.breakMinutes}
+            required
+            hint="Deducted when the day exceeds 5 hours."
+          >
+            <Input
+              id="breakMinutes"
+              name="breakMinutes"
+              type="number"
+              min={0}
+              max={240}
+              defaultValue={p.latest?.breakMinutes ?? 60}
+              className="tabular"
+              required
+            />
+          </Field>
+        </FieldGrid>
+      </div>
 
       <div className="grid gap-2 sm:grid-cols-5">
         {(

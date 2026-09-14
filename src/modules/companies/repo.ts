@@ -148,6 +148,16 @@ export function listHolidaysForYear(scope: Scope, companyId: string, year: numbe
   });
 }
 
+export function listHolidaysInRange(scope: Scope, companyId: string, start: string, end: string) {
+  return scoped(scope).holiday.findMany({
+    where: {
+      date: { gte: toDateOnly(start), lte: toDateOnly(end) },
+      OR: [{ companyId: null }, { companyId }],
+    },
+    orderBy: [{ date: "asc" }, { companyId: "asc" }],
+  });
+}
+
 export function getHoliday(scope: Scope, id: string) {
   return scoped(scope).holiday.findFirst({ where: { id } });
 }

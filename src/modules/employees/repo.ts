@@ -47,6 +47,10 @@ export type PaySettingRow = {
   philhealthCovered: boolean;
   pagibigCovered: boolean;
   taxWithheld: boolean;
+  restDayOfWeek: number;
+  shiftStart: string;
+  shiftEnd: string;
+  breakMinutes: number;
   note: string | null;
 };
 

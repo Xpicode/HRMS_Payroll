@@ -153,6 +153,17 @@ export async function savePolicy(scope: Scope, companyId: string, input: PolicyI
 // holidays
 // ---------------------------------------------------------------------------
 
+/** Holidays (national + this company) between two ISO dates inclusive. */
+export async function listHolidaysInRange(
+  scope: Scope,
+  companyId: string,
+  start: string,
+  end: string,
+) {
+  assertCompanyAccess(scope, companyId);
+  return repo.listHolidaysInRange(scope, companyId, start, end);
+}
+
 export async function listHolidays(scope: Scope, companyId: string, year: number) {
   assertCompanyAccess(scope, companyId);
   return repo.listHolidaysForYear(scope, companyId, year);
