@@ -1,0 +1,59 @@
+import bcrypt from "bcryptjs";
+
+/** bcrypt work factor. 12 ≈ 250ms on a modern CPU; raise when hardware allows. */
+export const BCRYPT_ROUNDS = 12;
+
+export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MAX_LENGTH = 128;
+
+export async function hashPassword(plain: string): Promise<string> {
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
+}
+
+export async function verifyPassword(plain: string, hash: string): Promise<boolean> {
+  try {
+    return await bcrypt.compare(plain, hash);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A bcrypt hash of a random string, used to equalise timing when the user does not exist
+ * (so "unknown email" and "wrong password" take the same time).
+ */
+let dummyHashPromise: Promise<string> | undefined;
+export function dummyHash(): Promise<string> {
+  dummyHashPromise ??= bcrypt.hash("timing-equaliser-" + Math.random(), BCRYPT_ROUNDS);
+  return dummyHashPromise;
+}
+
+export type PasswordPolicyResult = { ok: true } | { ok: false; reasons: string[] };
+
+/**
+ * Password policy (Phase 0 hardening):
+ * - 12–128 characters
+ * - at least one letter and one digit
+ * - must not contain the user's email local part
+ * - not on a small list of trivially guessable passwords
+ */
+export function checkPasswordPolicy(password: string, email?: string): PasswordPolicyResult {
+  const reasons: string[] = [];
+  if (password.length < PASSWORD_MIN_LENGTH)
+    reasons.push(`At least ${PASSWORD_MIN_LENGTH} characters`);
+  if (password.length > PASSWORD_MAX_LENGTH)
+    reasons.push(`At most ${PASSWORD_MAX_LENGTH} characters`);
+  if (!/[A-Za-z]/.test(password)) reasons.push("At least one letter");
+  if (!/\d/.test(password)) reasons.push("At least one digit");
+  if (email) {
+    const local = email.split("@")[0]?.toLowerCase();
+    if (local && local.length >= 3 && password.toLowerCase().includes(local)) {
+      reasons.push("Must not contain your email name");
+    }
+  }
+  const lowered = password.toLowerCase();
+  if (COMMON.some((c) => lowered.includes(c))) reasons.push("Too common or predictable");
+  return reasons.length ? { ok: false, reasons } : { ok: true };
+}
+
+const COMMON = ["password", "123456789", "qwertyuiop", "letmein", "welcome1", "admin123"];
