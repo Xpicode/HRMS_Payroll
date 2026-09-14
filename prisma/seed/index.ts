@@ -1,5 +1,5 @@
 /**
- * Idempotent seed: first ADMIN (from .env) + 2026 national holidays.
+ * Idempotent seed: first ADMIN (from .env), 2026 national holidays, statutory tables and pay components.
  * Run with `pnpm db:seed`. Safe to re-run; it never overwrites an existing admin's password.
  */
 import "dotenv/config";
@@ -8,6 +8,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../src/generated/prisma/client";
 import { HOLIDAYS_2026 } from "./holidays-2026";
 import { seedDemoCompany } from "./demo-company";
+import { seedStatutory } from "./statutory-2026";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is not set");
@@ -65,6 +66,7 @@ async function seedHolidays() {
 async function main() {
   await seedAdmin();
   await seedHolidays();
+  await seedStatutory(prisma);
   await seedDemoCompany(prisma);
 }
 

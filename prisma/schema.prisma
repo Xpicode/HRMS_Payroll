@@ -360,3 +360,84 @@ model DailyTimeRecord {
   @@index([companyId, date])
   @@map("daily_time_records")
 }
+
+// ---------------------------------------------------------------------------
+// Statutory tables (global, effective-dated) and pay components — Phase 3
+// ---------------------------------------------------------------------------
+
+/// One bracket of the SSS contribution schedule. Salary range -> monthly salary credit and shares.
+/// `wispEe/wispEr` are the mandatory provident fund (MPF/WISP) shares on the MSC portion above ₱20,000.
+model SssTable {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  minSalary     Decimal  @map("min_salary") @db.Decimal(12, 2)
+  /// null = no upper bound
+  maxSalary     Decimal? @map("max_salary") @db.Decimal(12, 2)
+  msc           Decimal  @db.Decimal(12, 2)
+  eeShare       Decimal  @map("ee_share") @db.Decimal(12, 2)
+  erShare       Decimal  @map("er_share") @db.Decimal(12, 2)
+  ecShare       Decimal  @map("ec_share") @db.Decimal(12, 2)
+  wispEe        Decimal  @default(0) @map("wisp_ee") @db.Decimal(12, 2)
+  wispEr        Decimal  @default(0) @map("wisp_er") @db.Decimal(12, 2)
+
+  @@unique([effectiveFrom, msc])
+  @@index([effectiveFrom])
+  @@map("sss_tables")
+}
+
+model PhilhealthRule {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  effectiveFrom DateTime @unique @map("effective_from") @db.Date
+  /// Total premium rate on the monthly basic salary, split equally EE/ER.
+  rate          Decimal  @db.Decimal(6, 4)
+  floorSalary   Decimal  @map("floor_salary") @db.Decimal(12, 2)
+  ceilingSalary Decimal  @map("ceiling_salary") @db.Decimal(12, 2)
+
+  @@map("philhealth_rules")
+}
+
+model PagibigRule {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  effectiveFrom      DateTime @unique @map("effective_from") @db.Date
+  eeRate             Decimal  @map("ee_rate") @db.Decimal(6, 4)
+  erRate             Decimal  @map("er_rate") @db.Decimal(6, 4)
+  maxFundSalary      Decimal  @map("max_fund_salary") @db.Decimal(12, 2)
+  lowIncomeThreshold Decimal  @map("low_income_threshold") @db.Decimal(12, 2)
+  lowIncomeEeRate    Decimal  @map("low_income_ee_rate") @db.Decimal(6, 4)
+
+  @@map("pagibig_rules")
+}
+
+/// BIR withholding tax table row: tax = baseTax + (taxable − lower) × rateOver for lower <= taxable < upper.
+model TaxBracket {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  effectiveFrom DateTime     @map("effective_from") @db.Date
+  frequency     PayFrequency
+  lower         Decimal      @db.Decimal(12, 2)
+  /// null = no upper bound
+  upper         Decimal?     @db.Decimal(12, 2)
+  baseTax       Decimal      @map("base_tax") @db.Decimal(12, 2)
+  rateOver      Decimal      @map("rate_over") @db.Decimal(6, 4)
+
+  @@unique([effectiveFrom, frequency, lower])
+  @@index([effectiveFrom, frequency])
+  @@map("tax_brackets")
+}
+
+enum PayComponentKind {
+  EARNING
+  DEDUCTION
+}
+
+/// Catalogue of payslip line types. `order` is the position on the payslip; `isSystem` rows are
+/// produced by the engine and cannot be deleted.
+model PayComponent {
+  code     String           @id
+  name     String
+  kind     PayComponentKind
+  taxable  Boolean          @default(false)
+  order    Int
+  isSystem Boolean          @default(false) @map("is_system")
+
+  @@map("pay_components")
+}

@@ -132,6 +132,12 @@ export async function readLogo(scope: Scope, companyId: string): Promise<Buffer 
 // payroll policy
 // ---------------------------------------------------------------------------
 
+/** Policy in force on a date (latest effective_from <= date); the engine reads this. */
+export async function getPolicyOn(scope: Scope, companyId: string, date: string) {
+  assertCompanyAccess(scope, companyId);
+  return repo.findPolicyEffectiveOn(scope, companyId, date);
+}
+
 export async function savePolicy(scope: Scope, companyId: string, input: PolicyInput) {
   assertPermission(scope, "policy.update");
   assertCompanyAccess(scope, companyId);

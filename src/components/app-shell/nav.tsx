@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Building2Icon,
+  CalculatorIcon,
   CalendarDaysIcon,
   ClockIcon,
   ContactIcon,
@@ -21,6 +22,7 @@ const ICONS = {
   holidays: CalendarDaysIcon,
   employees: ContactIcon,
   attendance: ClockIcon,
+  payroll: CalculatorIcon,
   settings: Settings2Icon,
   companies: Building2Icon,
   users: UsersIcon,

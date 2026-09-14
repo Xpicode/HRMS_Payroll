@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 2** (foundation, employees, and attendance: daily time records, cutoff summary, biometrics import).
+Status: **Phase 3** (foundation, employees, attendance incl. DTR card scanning, statutory tables, payroll engine and calculator).
 
 ## Run locally from a fresh clone
 
@@ -118,6 +118,32 @@ docker/                  dev image + entrypoint
   Saving stores the rows with source `SCAN`, audited like a manual save. Limits: one side of the card per photo
   (1–15 or 16–31), photo flat and straight, no night shifts crossing midnight; you pick the employee (names are
   not read).
+
+## Payroll engine and calculator (Phase 3)
+
+- **Statutory tables are rows, not code**: `sss_tables` (61 brackets, MSC ₱5,000–₱35,000, WISP split out above
+  ₱20,000, EC ₱10/₱30), `philhealth_rules` (5%, ₱10,000–₱100,000), `pagibig_rules` (2%/2% on up to ₱10,000; 1% EE at
+  ≤ ₱1,500) and `tax_brackets` (BIR table effective 2023, semi-monthly and monthly), each with `effective_from`.
+  Figures and their sources are in `prisma/seed/statutory-2026.ts`; a correction is a new row with a later date.
+  `pay_components` is the payslip line catalogue in display order.
+- **Engine** (`src/modules/payroll/engine/`, pure, decimal.js): `deriveRates` (monthly → daily via the policy divisor,
+  daily → monthly basic the same way, hourly = daily / hours per day), `computeBasic`, `computeHolidayPay`,
+  `computeOvertime` (policy multipliers + night differential), `computeLateUndertime`, `computeSss`,
+  `computePhilhealth`, `computePagibig`, `periodShare` (statutory timing: 1st / 2nd / split),
+  `computeWithholdingTax`, `applyLoans`, and `computePayslip`, which runs them in the plan's order: earnings →
+  contributions on the monthly basic → taxable income (taxable earnings − lates/undertime − employee contributions) →
+  tax → loans and other deductions → totals. Every line is rounded half-up to 2 decimals; totals are sums of rounded
+  lines; a negative net is flagged, never clamped.
+- **Rules the engine assumes** (owner to confirm against the Excel): daily employees are paid regular days worked plus
+  100% for unworked regular holidays, 200% × hours for worked regular holidays and 130% × hours for rest-day /
+  special-day work; monthly employees get half the monthly rate less absences at the derived daily rate, nothing extra
+  for unworked holidays (already in the monthly pay), the premium only (100% / 30%) for holiday / special-day work and
+  130% for rest-day work; loans amortize half the monthly amount per semi-monthly cutoff, capped at the balance.
+- **Worked examples** in `tests/payroll-engine/` (daily-rate, monthly, minimum-wage, SSS loan, SSS ceiling, negative
+  net) keep the expected figures in a table at the top of each file and run against the seeded tables.
+- **Payroll calculator** (Payroll → Calculator, ADMIN and PAYROLL_OFFICER): employee + cutoff → the Phase 2 attendance
+  summary, the pay setting and policy in force on the cutoff end, overlapping recurring items and the statutory
+  tables → lines and totals in payslip order, plus basis, attendance and employer-share panels. Nothing is saved.
 
 ## Conventions worth knowing
 

@@ -19,6 +19,7 @@ export const PERMISSIONS = {
   "attendance.view": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
   "attendance.manage": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
   "attendance.import": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
+  "payroll.compute": ["ADMIN", "PAYROLL_OFFICER"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;
