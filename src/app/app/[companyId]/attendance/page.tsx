@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { UploadIcon } from "lucide-react";
+import { ScanLineIcon, UploadIcon } from "lucide-react";
 import { getScope, requireCompany } from "@/lib/session";
 import { roleCan } from "@/lib/permissions";
 import { formatCutoff } from "@/lib/dates";
@@ -75,14 +75,24 @@ export default async function AttendancePage({
         description={`Daily time records and the cutoff summary the payroll engine reads. ${ctx.days.length} days, ${holidays.length} holiday(s).`}
         actions={
           canImport ? (
-            <Button
-              variant="outline"
-              render={<Link href={`${basePath}/import`} />}
-              nativeButton={false}
-            >
-              <UploadIcon data-icon="inline-start" />
-              Import biometrics
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                render={<Link href={`${basePath}/scan?${q}`} />}
+                nativeButton={false}
+              >
+                <ScanLineIcon data-icon="inline-start" />
+                Scan DTR cards
+              </Button>
+              <Button
+                variant="outline"
+                render={<Link href={`${basePath}/import`} />}
+                nativeButton={false}
+              >
+                <UploadIcon data-icon="inline-start" />
+                Import biometrics
+              </Button>
+            </div>
           ) : null
         }
       />

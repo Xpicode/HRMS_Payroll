@@ -108,6 +108,16 @@ docker/                  dev image + entrypoint
   undertime, night diff, and regular holidays worked / not worked.
 - **Biometrics import**: CSV with employee_no, date, time_in, time_out (several date and time formats accepted; multiple
   punches on a day are merged). Preview shows the computed figures and errors; imported days replace manual ones.
+- **DTR card scan** (Attendance → Scan DTR cards): photograph or scan a paper bundy card (e.g. Ideaworks Model 9000:
+  day rows, Morning / Afternoon / Overtime In-Out). OCR runs inside the app (`tesseract.js` WASM + the pinned
+  `@tesseract.js-data/eng` model — no cloud, no CDN, works offline). The browser downsizes the photo, the server
+  validates it with sharp, reads it in memory and discards it; nothing is stored. `card-layout.ts` (pure, tested)
+  finds the printed day numbers, fits the row pitch, assigns each printed time to its day and resolves AM/PM
+  chronologically (758 → 1203 → 1258 → 502 = 07:58 → 17:02). The result prefills the normal DTR grid with the
+  card image and detected boxes beside it; amber rows need a look (odd punch count, low confidence, off-row).
+  Saving stores the rows with source `SCAN`, audited like a manual save. Limits: one side of the card per photo
+  (1–15 or 16–31), photo flat and straight, no night shifts crossing midnight; you pick the employee (names are
+  not read).
 
 ## Conventions worth knowing
 

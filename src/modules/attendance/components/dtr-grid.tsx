@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState, useMemo, useState, type KeyboardEvent } from "react";
-import type { DayType } from "@/generated/prisma/enums";
+import type { DayType, DtrSource } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
 import { FormAlert } from "@/components/form/form-alert";
 import { SubmitButton } from "@/components/form/submit-button";
-import { initialActionState } from "@/lib/action-result";
+import { initialActionState, type ActionResult } from "@/lib/action-result";
 import { formatDateOnly, WEEKDAY_SHORT } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { computeDay, parseHHMM } from "../compute";
@@ -21,8 +21,11 @@ export type GridDayProp = {
   holidayName: string | null;
   shift: Shift;
   record: AttendanceDay | null;
-  source: "MANUAL" | "IMPORT" | null;
+  source: DtrSource | null;
 };
+
+/** Per-row note shown under the date, e.g. what a card scan read for that day. */
+export type DtrRowHint = { level: "ok" | "check" | "replaces"; note: string };
 
 type Row = {
   date: string;
@@ -40,6 +43,12 @@ type Row = {
 
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+
+const SOURCE_LABELS: Record<DtrSource, string | null> = {
+  MANUAL: null,
+  IMPORT: "imported",
+  SCAN: "scanned",
+};
 
 function rowFrom(d: GridDayProp): Row {
   const r = d.record;
@@ -81,6 +90,12 @@ const ROW_TINT: Partial<Record<DayType, string>> = {
   SPECIAL_NON_WORKING: "bg-brand/5",
 };
 
+const HINT_TEXT: Record<DtrRowHint["level"], string> = {
+  ok: "text-success",
+  check: "text-warning-foreground",
+  replaces: "text-muted-foreground",
+};
+
 type Props = {
   companyId: string;
   employeeId: string;
@@ -88,12 +103,26 @@ type Props = {
   end: string;
   days: GridDayProp[];
   canEdit: boolean;
+  /** Defaults to the manual save; the card scanner passes its own. */
+  action?: (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
+  submitLabel?: string;
+  hints?: Record<string, DtrRowHint>;
 };
 
-export function DtrGrid({ companyId, employeeId, start, end, days, canEdit }: Props) {
+export function DtrGrid({
+  companyId,
+  employeeId,
+  start,
+  end,
+  days,
+  canEdit,
+  action,
+  submitLabel,
+  hints,
+}: Props) {
   const [rows, setRows] = useState<Row[]>(() => days.map(rowFrom));
   const [state, formAction] = useActionState(
-    saveDtrAction.bind(null, companyId, employeeId, start, end),
+    action ?? saveDtrAction.bind(null, companyId, employeeId, start, end),
     initialActionState,
   );
   const shifts = useMemo(() => new Map(days.map((d) => [d.date, d.shift])), [days]);
@@ -217,6 +246,8 @@ export function DtrGrid({ companyId, employeeId, start, end, days, canEdit }: Pr
               const c = results[i]!;
               const derived = c.derived && !r.isAbsent;
               const disabled = !canEdit || r.isAbsent;
+              const hint = hints?.[r.date];
+              const sourceLabel = day.source ? SOURCE_LABELS[day.source] : null;
               return (
                 <tr
                   key={r.date}
@@ -224,6 +255,7 @@ export function DtrGrid({ companyId, employeeId, start, end, days, canEdit }: Pr
                     "border-t [&>td]:px-2 [&>td]:py-1",
                     ROW_TINT[r.dayType],
                     c.isAbsent && "bg-destructive/5",
+                    hint?.level === "check" && "bg-warning/10",
                   )}
                 >
                   <td className="whitespace-nowrap">
@@ -235,8 +267,19 @@ export function DtrGrid({ companyId, employeeId, start, end, days, canEdit }: Pr
                       <span className="block truncate text-[11px] text-brand-foreground/80">
                         {day.holidayName}
                       </span>
-                    ) : day.source === "IMPORT" ? (
-                      <span className="block text-[11px] text-muted-foreground">imported</span>
+                    ) : sourceLabel && !hint ? (
+                      <span className="block text-[11px] text-muted-foreground">{sourceLabel}</span>
+                    ) : null}
+                    {hint ? (
+                      <span
+                        className={cn(
+                          "block max-w-44 truncate font-mono text-[11px]",
+                          HINT_TEXT[hint.level],
+                        )}
+                        title={hint.note}
+                      >
+                        {hint.note}
+                      </span>
                     ) : null}
                   </td>
                   <td>
@@ -429,7 +472,7 @@ export function DtrGrid({ companyId, employeeId, start, end, days, canEdit }: Pr
             <Button type="button" variant="outline" onClick={() => setRows(days.map(rowFrom))}>
               Reset
             </Button>
-            <SubmitButton pendingText="Saving…">Save attendance</SubmitButton>
+            <SubmitButton pendingText="Saving…">{submitLabel ?? "Save attendance"}</SubmitButton>
           </div>
         </div>
       ) : null}

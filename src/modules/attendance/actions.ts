@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import type { DtrSource } from "@/generated/prisma/enums";
 import { getScope } from "@/lib/session";
 import { isUuid } from "@/lib/request";
 import { CsvError } from "@/lib/csv";
@@ -16,14 +17,15 @@ function handleError(e: unknown): ActionResult {
   return fail("Something went wrong. Please try again.");
 }
 
-export async function saveDtrAction(
+/** Shared by the manual grid and the scanned-card grid; returns a failure result or null. */
+async function saveGrid(
   companyId: string,
   employeeId: string,
   start: string,
   end: string,
-  _prev: ActionResult,
   formData: FormData,
-): Promise<ActionResult> {
+  source: DtrSource,
+): Promise<ActionResult | null> {
   if (!isUuid(companyId) || !isUuid(employeeId)) return fail("Invalid request.");
   const cutoff = cutoffParamsSchema.safeParse({ start, end });
   if (!cutoff.success) return fail("Invalid cutoff.");
@@ -43,14 +45,73 @@ export async function saveDtrAction(
       employeeId,
       { ...cutoff.data, sequenceInMonth: 1 },
       rows,
+      source,
     );
   } catch (e) {
     return handleError(e);
   }
   revalidatePath(`/app/${companyId}/attendance`);
-  redirect(
-    `/app/${companyId}/attendance/${employeeId}?start=${cutoff.data.start}&end=${cutoff.data.end}&saved=1`,
-  );
+  return null;
+}
+
+export async function saveDtrAction(
+  companyId: string,
+  employeeId: string,
+  start: string,
+  end: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const failed = await saveGrid(companyId, employeeId, start, end, formData, "MANUAL");
+  if (failed) return failed;
+  redirect(`/app/${companyId}/attendance/${employeeId}?start=${start}&end=${end}&saved=1`);
+}
+
+export async function saveScannedDtrAction(
+  companyId: string,
+  employeeId: string,
+  start: string,
+  end: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const failed = await saveGrid(companyId, employeeId, start, end, formData, "SCAN");
+  if (failed) return failed;
+  redirect(`/app/${companyId}/attendance/scan?start=${start}&end=${end}&saved=${employeeId}`);
+}
+
+export async function cardScanPreviewAction(
+  companyId: string,
+  _prev: ActionResult<service.CardScanPreview>,
+  formData: FormData,
+): Promise<ActionResult<service.CardScanPreview>> {
+  if (!isUuid(companyId)) return fail("Invalid company.");
+  const employeeId = formData.get("employeeId");
+  if (typeof employeeId !== "string" || !isUuid(employeeId))
+    return fail("Choose an employee.", { employeeId: ["Required"] });
+  const cutoff = cutoffParamsSchema.safeParse({
+    start: formData.get("start"),
+    end: formData.get("end"),
+  });
+  if (!cutoff.success) return fail("Invalid cutoff.");
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0)
+    return fail("Choose a photo of the card.", { image: ["No photo selected"] });
+  if (file.size > service.CARD_IMAGE_MAX_BYTES)
+    return fail("The photo must be 3 MB or smaller.", { image: ["File too large"] });
+  try {
+    const scope = await getScope();
+    const data = await service.previewCardScan(
+      scope,
+      companyId,
+      employeeId,
+      { ...cutoff.data, sequenceInMonth: 1 },
+      Buffer.from(await file.arrayBuffer()),
+    );
+    return success(undefined, data);
+  } catch (e) {
+    return handleError(e);
+  }
 }
 
 export async function biometricsPreviewAction(

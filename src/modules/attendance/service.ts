@@ -1,13 +1,16 @@
 import "server-only";
-import type { DayType, HolidayType } from "@/generated/prisma/enums";
+import type { DayType, DtrSource, HolidayType } from "@/generated/prisma/enums";
 import { audit } from "@/lib/audit";
 import { AppError } from "@/lib/action-result";
 import { parseCsv } from "@/lib/csv";
 import { dayOfWeek, daysInMonth, eachDay, toDateOnly, toIsoDate, type Cutoff } from "@/lib/dates";
 import { assertCompanyAccess, type Scope } from "@/lib/scope";
 import { assertPermission } from "@/lib/session";
+import { getLimiter } from "@/lib/rate-limit";
 import { getCompany, listHolidaysInRange } from "@/modules/companies/service";
 import * as repo from "./repo";
+import { parseCard, type CardWord } from "./card-layout";
+import { CARD_IMAGE_MAX_BYTES, recognizeCard } from "./ocr";
 import { computeDay, DEFAULT_SHIFT, round2, type DayEntry } from "./compute";
 import { resolveDayType, summarizeCutoff, type SummaryDay } from "./summary";
 import {
@@ -217,8 +220,31 @@ export type GridDay = {
   holidayName: string | null;
   shift: Shift;
   record: AttendanceDay | null;
-  source: "MANUAL" | "IMPORT" | null;
+  source: DtrSource | null;
 };
+
+type RecordLike = Parameters<typeof toAttendanceDay>[0] & { source: DtrSource };
+
+function gridDays(
+  paySettings: (PaySettingLike & { effectiveFrom: Date })[],
+  ctx: CutoffContext,
+  records: RecordLike[],
+): GridDay[] {
+  const byDate = new Map(records.map((r) => [toIsoDate(r.date), r]));
+  return ctx.days.map((date) => {
+    const setting = paySettingOn(paySettings, date);
+    const r = byDate.get(date);
+    return {
+      date,
+      weekday: dayOfWeek(date),
+      defaultDayType: defaultDayType(ctx, date, setting),
+      holidayName: ctx.holidays.get(date)?.name ?? null,
+      shift: shiftFor(ctx, setting),
+      record: r ? toAttendanceDay(r) : null,
+      source: r?.source ?? null,
+    };
+  });
+}
 
 export async function employeeDtr(
   scope: Scope,
@@ -232,20 +258,7 @@ export async function employeeDtr(
   if (!employee) throw new AppError("Employee not found.");
   const ctx = await loadContext(scope, companyId, cutoff);
   const records = await repo.listRecords(scope, companyId, cutoff.start, cutoff.end, employeeId);
-  const byDate = new Map(records.map((r) => [toIsoDate(r.date), r]));
-  const days: GridDay[] = ctx.days.map((date) => {
-    const setting = paySettingOn(employee.paySettings, date);
-    const r = byDate.get(date);
-    return {
-      date,
-      weekday: dayOfWeek(date),
-      defaultDayType: defaultDayType(ctx, date, setting),
-      holidayName: ctx.holidays.get(date)?.name ?? null,
-      shift: shiftFor(ctx, setting),
-      record: r ? toAttendanceDay(r) : null,
-      source: r?.source ?? null,
-    };
-  });
+  const days = gridDays(employee.paySettings, ctx, records);
   const summaryDays: SummaryDay[] = days.map((d) => ({
     date: d.date,
     dayType: d.defaultDayType,
@@ -302,6 +315,7 @@ export async function saveEmployeeDtr(
   employeeId: string,
   cutoff: Cutoff,
   input: unknown,
+  source: DtrSource = "MANUAL",
 ) {
   assertPermission(scope, "attendance.manage");
   assertCompanyAccess(scope, companyId);
@@ -333,7 +347,7 @@ export async function saveEmployeeDtr(
       nightDiffHours: c.nightDiffHours,
       isAbsent: c.isAbsent,
       remarks: r.remarks,
-      source: "MANUAL",
+      source,
     };
   });
 
@@ -637,3 +651,132 @@ export async function commitBiometrics(
 
 // re-exported for the grid's live computation
 export { round2 };
+
+// ---------------------------------------------------------------------------
+// DTR card scan (photographed bundy card -> prefilled grid)
+// ---------------------------------------------------------------------------
+
+export { CARD_IMAGE_MAX_BYTES };
+
+export type CardDayHint = { level: "ok" | "check" | "replaces"; note: string };
+
+export type CardScanPreview = {
+  employee: { id: string; employeeNo: string; name: string };
+  /** The cutoff grid: scanned days carry the OCR punches, the rest keep what is saved. */
+  days: GridDay[];
+  hints: Record<string, CardDayHint>;
+  /** Every digit-word the OCR found, classified, in the preprocessed image's pixel space. */
+  words: CardWord[];
+  image: { width: number; height: number };
+  warnings: string[];
+  found: number;
+  ok: boolean;
+};
+
+/** Employees shown in the scan page's picker for a cutoff. */
+export async function listEmployeesInCutoff(scope: Scope, companyId: string, cutoff: Cutoff) {
+  assertPermission(scope, "attendance.view");
+  assertCompanyAccess(scope, companyId);
+  const employees = await repo.listEmployeesForRange(scope, companyId, cutoff.start, cutoff.end);
+  return employees.map((e) => ({
+    id: e.id,
+    employeeNo: e.employeeNo,
+    name: `${e.lastName}, ${e.firstName}`,
+  }));
+}
+
+/**
+ * OCR one card photo and lay the punches over the employee's grid for the cutoff.
+ * Nothing is saved: the encoder reviews the grid and saves it (source SCAN).
+ * The image is processed in memory and discarded.
+ */
+export async function previewCardScan(
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+  cutoff: Cutoff,
+  image: Buffer,
+): Promise<CardScanPreview> {
+  assertPermission(scope, "attendance.import");
+  assertCompanyAccess(scope, companyId);
+  // OCR is CPU-bound (~1–3 s per card); keep one user from monopolising the process.
+  const limit = getLimiter("card-scan", 30, 60_000).consume(scope.userId);
+  if (!limit.ok) throw new AppError("Too many scans in a short time. Wait a minute and try again.");
+
+  const employee = await repo.getEmployeeWithPaySettings(scope, companyId, employeeId);
+  if (!employee) throw new AppError("Employee not found.");
+  const ctx = await loadContext(scope, companyId, cutoff);
+  const records = await repo.listRecords(scope, companyId, cutoff.start, cutoff.end, employeeId);
+  const days = gridDays(employee.paySettings, ctx, records);
+
+  const ocr = await recognizeCard(image);
+  const parsed = parseCard(ocr.words, ocr, {
+    firstDay: Number(cutoff.start.slice(8)),
+    lastDay: Number(cutoff.end.slice(8)),
+  });
+
+  const hints: Record<string, CardDayHint> = {};
+  let found = 0;
+  const month = cutoff.start.slice(0, 7);
+  for (const cd of parsed.days) {
+    if (cd.punches.length === 0) continue;
+    const date = `${month}-${String(cd.day).padStart(2, "0")}`;
+    const day = days.find((d) => d.date === date);
+    if (!day) continue;
+    found++;
+    const setting = paySettingOn(employee.paySettings, date);
+    // keep a saved day-type override (e.g. a swapped rest day); otherwise the calendar default
+    const dayType = day.record?.dayType ?? day.defaultDayType;
+    const c = computeDay(
+      {
+        dayType,
+        timeIn: cd.timeIn,
+        timeOut: cd.timeOut,
+        hoursWorked: null,
+        lateMinutes: null,
+        undertimeMinutes: null,
+        otHours: null,
+        nightDiffHours: null,
+        isAbsent: false,
+      },
+      shiftFor(ctx, setting),
+    );
+    const replaces = day.record !== null;
+    day.record = {
+      date,
+      dayType,
+      timeIn: cd.timeIn,
+      timeOut: cd.timeOut,
+      hoursWorked: c.hoursWorked,
+      lateMinutes: c.lateMinutes,
+      undertimeMinutes: c.undertimeMinutes,
+      otHours: c.otHours,
+      nightDiffHours: c.nightDiffHours,
+      isAbsent: c.isAbsent,
+      remarks: day.record?.remarks ?? null,
+    };
+    day.source = "SCAN";
+    const notes = [...cd.notes];
+    if (replaces) notes.push("replaces the saved entry");
+    const punches = cd.punches.map((p) => p.text).join(" ");
+    hints[date] = {
+      level: cd.notes.length ? "check" : replaces ? "replaces" : "ok",
+      note: notes.length ? `${punches} · ${notes.join(", ")}` : punches,
+    };
+  }
+
+  return {
+    employee: {
+      id: employee.id,
+      employeeNo: employee.employeeNo,
+      name: `${employee.lastName}, ${employee.firstName}`,
+    },
+    days,
+    hints,
+    words: parsed.words,
+    image: { width: ocr.width, height: ocr.height },
+    warnings: parsed.warnings,
+    found,
+    ok: parsed.ok,
+  };
+}

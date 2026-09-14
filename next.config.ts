@@ -34,7 +34,24 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   output: "standalone",
-  serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "sharp", "bcryptjs"],
+  serverExternalPackages: [
+    "@prisma/client",
+    "@prisma/adapter-pg",
+    "pg",
+    "sharp",
+    "bcryptjs",
+    "tesseract.js", // spawns a worker_thread from its own files; must not be bundled
+  ],
+  // The OCR engine loads its WASM core and language model by path at runtime, so the
+  // standalone build has to carry those files explicitly.
+  outputFileTracingIncludes: {
+    "/app/[companyId]/attendance/scan": [
+      "./node_modules/tesseract.js/**",
+      "./node_modules/tesseract.js-core/**",
+      "./node_modules/wasm-feature-detect/**",
+      "./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**",
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "4mb", // logo uploads

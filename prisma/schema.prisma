@@ -328,6 +328,7 @@ enum DayType {
 enum DtrSource {
   MANUAL
   IMPORT
+  SCAN
 }
 
 /// Inputs (time in/out) and the computed figures are both stored so the cutoff summary
