@@ -23,6 +23,9 @@ export const TENANT_MODELS: Readonly<Record<string, TenantMode>> = {
   CompanyPayrollPolicy: "strict",
   Holiday: "sharedNull",
   UserCompany: "strict",
+  Employee: "strict",
+  EmployeePaySetting: "strict",
+  EmployeeRecurringItem: "strict",
 };
 
 export const REFUSED_OPERATIONS: ReadonlySet<string> = new Set([

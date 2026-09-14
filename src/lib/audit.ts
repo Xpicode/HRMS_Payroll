@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
-import { prisma, type TxClient } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import type { Scope } from "@/lib/scope";
 
 export type AuditAction =
@@ -22,8 +22,13 @@ export type AuditContext = {
   actorId?: string | null;
   ip?: string | null;
   companyId?: string | null;
-  /** Pass the transaction client so the audit row commits with the change. */
-  tx?: TxClient;
+  /** Pass the transaction client (raw or scoped) so the audit row commits with the change. */
+  tx?: AuditWriter;
+};
+
+/** Structural type so both the raw Prisma transaction and a scoped() transaction qualify. */
+export type AuditWriter = {
+  auditLog: { create(args: { data: Prisma.AuditLogUncheckedCreateInput }): Promise<unknown> };
 };
 
 const REDACT_KEY = /password|hash|secret|token/i;
@@ -61,7 +66,7 @@ export async function audit(
   after: unknown,
   ctx: AuditContext,
 ): Promise<void> {
-  const client = ctx.tx ?? prisma;
+  const client: AuditWriter = ctx.tx ?? prisma;
   await client.auditLog.create({
     data: {
       entity,

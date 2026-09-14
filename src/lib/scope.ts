@@ -79,3 +79,5 @@ export function scoped(scope: Scope, db: Db = prisma) {
 }
 
 export type ScopedDb = ReturnType<typeof scoped>;
+/** The client handed to `scoped(scope).$transaction(async (tx) => ...)`. */
+export type ScopedTx = Parameters<Parameters<ScopedDb["$transaction"]>[0]>[0];

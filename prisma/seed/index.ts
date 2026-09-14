@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../src/generated/prisma/client";
 import { HOLIDAYS_2026 } from "./holidays-2026";
+import { seedDemoCompany } from "./demo-company";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is not set");
@@ -64,6 +65,7 @@ async function seedHolidays() {
 async function main() {
   await seedAdmin();
   await seedHolidays();
+  await seedDemoCompany(prisma);
 }
 
 main()

@@ -94,6 +94,9 @@ model Company {
   slipCodePrefix      String       @map("slip_code_prefix")
   slipCodeNext        Int          @default(1) @map("slip_code_next")
   slipCodePad         Int          @default(3) @map("slip_code_pad")
+  employeeNoPrefix    String       @default("EMP") @map("employee_no_prefix")
+  employeeNoNext      Int          @default(1) @map("employee_no_next")
+  employeeNoPad       Int          @default(4) @map("employee_no_pad")
   isActive            Boolean      @default(true) @map("is_active")
   createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -102,6 +105,9 @@ model Company {
   policies  CompanyPayrollPolicy[]
   holidays  Holiday[]
   auditLogs AuditLog[]
+  employees      Employee[]
+  paySettings    EmployeePaySetting[]
+  recurringItems EmployeeRecurringItem[]
 
   @@map("companies")
 }
@@ -177,4 +183,124 @@ model AuditLog {
   @@index([companyId, at])
   @@index([userId, at])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// employees (Phase 1) — 201 record, effective-dated pay settings, recurring items
+// ---------------------------------------------------------------------------
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SEPARATED
+}
+
+enum PayType {
+  MONTHLY
+  DAILY
+  COMMISSION
+}
+
+/// BIR tax status codes kept for the 201 record and 2316; withholding under TRAIN does not depend on them.
+enum TaxStatus {
+  S
+  ME
+  S1
+  S2
+  S3
+  S4
+  ME1
+  ME2
+  ME3
+  ME4
+}
+
+enum RecurringItemKind {
+  EARNING
+  DEDUCTION
+}
+
+model Employee {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  companyId      String         @map("company_id") @db.Uuid
+  employeeNo     String         @map("employee_no")
+  lastName       String         @map("last_name")
+  firstName      String         @map("first_name")
+  middleName     String?        @map("middle_name")
+  suffix         String?
+  birthDate      DateTime?      @map("birth_date") @db.Date
+  hireDate       DateTime       @map("hire_date") @db.Date
+  separationDate DateTime?      @map("separation_date") @db.Date
+  status         EmployeeStatus @default(ACTIVE)
+  position       String?
+  department     String?
+  email          String?
+  mobile         String?
+  address        String?
+  /// Government IDs are stored as digits only; formatting is applied when printed.
+  sssNo          String?        @map("sss_no")
+  philhealthNo   String?        @map("philhealth_no")
+  pagibigMid     String?        @map("pagibig_mid")
+  tin            String?
+  taxStatus      TaxStatus      @default(S) @map("tax_status")
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  paySettings    EmployeePaySetting[]
+  recurringItems EmployeeRecurringItem[]
+
+  @@unique([companyId, employeeNo])
+  @@index([companyId, status])
+  @@index([companyId, lastName, firstName])
+  @@map("employees")
+}
+
+/// One row per change of pay terms. The row in force on a date is the latest with effective_from <= date.
+model EmployeePaySetting {
+  id                  String       @id @default(uuid(7)) @db.Uuid
+  companyId           String       @map("company_id") @db.Uuid
+  employeeId          String       @map("employee_id") @db.Uuid
+  effectiveFrom       DateTime     @map("effective_from") @db.Date
+  payType             PayType      @map("pay_type")
+  monthlyRate         Decimal?     @map("monthly_rate") @db.Decimal(12, 2)
+  dailyRate           Decimal?     @map("daily_rate") @db.Decimal(12, 2)
+  payFrequency        PayFrequency @map("pay_frequency")
+  isMinimumWageEarner Boolean      @default(false) @map("is_minimum_wage_earner")
+  sssCovered          Boolean      @default(true) @map("sss_covered")
+  philhealthCovered   Boolean      @default(true) @map("philhealth_covered")
+  pagibigCovered      Boolean      @default(true) @map("pagibig_covered")
+  taxWithheld         Boolean      @default(true) @map("tax_withheld")
+  note                String?
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, effectiveFrom])
+  @@index([companyId])
+  @@map("employee_pay_settings")
+}
+
+/// Fixed allowances or deductions applied every period while in effect.
+model EmployeeRecurringItem {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  companyId     String            @map("company_id") @db.Uuid
+  employeeId    String            @map("employee_id") @db.Uuid
+  componentCode String            @map("component_code")
+  kind          RecurringItemKind
+  label         String
+  amount        Decimal           @db.Decimal(12, 2)
+  effectiveFrom DateTime          @map("effective_from") @db.Date
+  effectiveTo   DateTime?         @map("effective_to") @db.Date
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, effectiveFrom])
+  @@index([companyId])
+  @@map("employee_recurring_items")
 }

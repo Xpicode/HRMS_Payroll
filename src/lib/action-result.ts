@@ -8,7 +8,16 @@ export type FieldErrors = Record<string, string[] | undefined>;
 
 export type ActionResult<T = undefined> =
   | { ok: true; message?: string; data?: T }
-  | { ok: false; message?: string; fieldErrors?: FieldErrors };
+  | {
+      ok: false;
+      message?: string;
+      fieldErrors?: FieldErrors;
+      /** Non-blocking findings; the caller may resubmit with confirmation. */
+      warnings?: string[];
+      needsConfirm?: boolean;
+      /** Submitted string fields, echoed back so uncontrolled inputs keep the user's entries after a failed submit. */
+      values?: Record<string, string>;
+    };
 
 export const initialActionState: ActionResult = { ok: false };
 
@@ -35,6 +44,16 @@ export function success<T>(message?: string, data?: T): ActionResult<T> {
   return { ok: true, message, data };
 }
 
+/** String fields of a FormData (files and internal keys dropped), for echoing back to a form. */
+export function formValues(formData: FormData): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("$ACTION") || typeof value !== "string") continue;
+    if (!(key in out)) out[key] = value;
+  }
+  return out;
+}
+
 /** Convert a FormData into a plain object; repeated keys become arrays. Files are kept as File. */
 export function formToObject(formData: FormData): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -56,6 +75,14 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = "AppError";
+  }
+}
+
+/** Thrown when input is acceptable but has findings the user must confirm (e.g. odd ID formats). */
+export class NeedsConfirmError extends AppError {
+  constructor(public readonly warnings: string[]) {
+    super("Please review the warnings and confirm.");
+    this.name = "NeedsConfirmError";
   }
 }
 

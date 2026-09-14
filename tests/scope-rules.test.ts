@@ -153,6 +153,9 @@ describe("TENANT_MODELS", () => {
     expect(Object.keys(TENANT_MODELS).sort()).toEqual([
       "Company",
       "CompanyPayrollPolicy",
+      "Employee",
+      "EmployeePaySetting",
+      "EmployeeRecurringItem",
       "Holiday",
       "UserCompany",
     ]);
