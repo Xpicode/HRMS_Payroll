@@ -8,9 +8,9 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 8080",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "next start -p 8080",
     "typecheck": "prisma generate && next typegen && tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

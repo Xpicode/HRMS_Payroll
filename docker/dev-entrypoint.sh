@@ -15,5 +15,5 @@ pnpm db:seed
 
 mkdir -p /data/uploads/logos
 
-echo "==> Starting Next.js dev server on :3000"
-exec pnpm exec next dev -H 0.0.0.0 -p 3000
+echo "==> Starting Next.js dev server on :8080"
+exec pnpm exec next dev -H 0.0.0.0 -p 8080

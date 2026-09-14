@@ -18,7 +18,7 @@ docker compose up
 
 First start takes a few minutes (base image, dependency install). Then:
 
-1. Open http://localhost:3000 and sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+1. Open http://localhost:8080 and sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 2. You are asked to set a new password (the seeded one is temporary).
 3. Administration → Companies → New company. Create your companies, upload logos, review the payroll policy.
 4. Administration → Users → New user. Assign companies to payroll officers and encoders.
@@ -34,7 +34,7 @@ docker compose up db -d          # Postgres only, bound to 127.0.0.1:5433 (POSTG
 pnpm install
 pnpm db:migrate                  # applies migrations (creates one if the schema changed)
 pnpm db:seed
-pnpm dev                         # http://localhost:3000
+pnpm dev                         # http://localhost:8080
 ```
 
 ## Scripts

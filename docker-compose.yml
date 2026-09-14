@@ -1,6 +1,6 @@
 # Local development stack: app (Next.js dev server) + db (PostgreSQL 16).
 # `docker compose up` on a fresh clone installs dependencies, applies migrations,
-# seeds the first admin and starts the app on http://localhost:3000.
+# seeds the first admin and starts the app on http://localhost:8080.
 #
 # Requires a `.env` (copy `.env.example`). The db port is bound to 127.0.0.1 only so
 # it is reachable from the host for `pnpm dev` / Prisma Studio but not from the LAN.
@@ -36,12 +36,12 @@ services:
       # Overrides for the container network / volume layout
       DATABASE_URL: postgresql://${POSTGRES_USER:-hrms}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hrms}?schema=public
       DATA_DIR: /data
-      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_URL: ${AUTH_URL:-http://localhost:8080}
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
       npm_config_store_dir: /pnpm/store
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_PORT:-8080}:8080"
     volumes:
       - .:/app
       - hrms_node_modules:/app/node_modules
