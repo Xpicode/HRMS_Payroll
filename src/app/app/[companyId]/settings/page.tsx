@@ -65,6 +65,9 @@ export default async function CompanySettingsPage({
               slipCodePrefix: company.slipCodePrefix,
               slipCodeNext: company.slipCodeNext,
               slipCodePad: company.slipCodePad,
+              employeeNoPrefix: company.employeeNoPrefix,
+              employeeNoNext: company.employeeNoNext,
+              employeeNoPad: company.employeeNoPad,
               isActive: company.isActive,
             }}
           />

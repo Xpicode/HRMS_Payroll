@@ -42,6 +42,13 @@ export const companySchema = z.object({
     .regex(/^[A-Z0-9]{1,8}$/, "1–8 letters or digits, e.g. OMS"),
   slipCodeNext: z.coerce.number().int().min(1).max(999_999),
   slipCodePad: z.coerce.number().int().min(1).max(6),
+  employeeNoPrefix: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{1,8}$/, "1–8 letters or digits, e.g. EMP"),
+  employeeNoNext: z.coerce.number().int().min(1).max(999_999),
+  employeeNoPad: z.coerce.number().int().min(1).max(6),
 });
 export type CompanyInput = z.infer<typeof companySchema>;
 

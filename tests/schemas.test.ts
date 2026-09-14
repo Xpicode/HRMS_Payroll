@@ -19,6 +19,9 @@ describe("companySchema", () => {
     slipCodePrefix: "oms",
     slipCodeNext: "15",
     slipCodePad: "3",
+    employeeNoPrefix: "emp",
+    employeeNoNext: "1",
+    employeeNoPad: "4",
   };
   it("normalises code/prefix to uppercase and blanks to null", () => {
     const r = companySchema.parse(valid);

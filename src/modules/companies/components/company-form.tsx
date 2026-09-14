@@ -38,6 +38,9 @@ export type CompanyFormValues = {
   slipCodePrefix: string;
   slipCodeNext: number;
   slipCodePad: number;
+  employeeNoPrefix: string;
+  employeeNoNext: number;
+  employeeNoPad: number;
   isActive: boolean;
 };
 
@@ -56,6 +59,10 @@ export function CompanyForm(props: Props) {
   const [next, setNext] = useState(String(c?.slipCodeNext ?? 1));
   const [pad, setPad] = useState(String(c?.slipCodePad ?? 3));
   const preview = `${prefix.toUpperCase() || "PRE"}-${String(Number(next) || 1).padStart(Number(pad) || 3, "0")}`;
+  const [empPrefix, setEmpPrefix] = useState(c?.employeeNoPrefix ?? "EMP");
+  const [empNext, setEmpNext] = useState(String(c?.employeeNoNext ?? 1));
+  const [empPad, setEmpPad] = useState(String(c?.employeeNoPad ?? 4));
+  const empPreview = `${empPrefix.toUpperCase() || "EMP"}-${String(Number(empNext) || 1).padStart(Number(empPad) || 4, "0")}`;
 
   return (
     <form action={formAction} noValidate>
@@ -250,6 +257,65 @@ export function CompanyForm(props: Props) {
                 <p className="text-[13px] font-medium">Next slip code</p>
                 <p className="flex h-8 items-center rounded-lg bg-muted px-2.5 font-mono text-sm">
                   {preview}
+                </p>
+              </div>
+            </FieldGrid>
+          </div>
+
+          <Separator />
+          <div>
+            <p className="mb-3 text-sm font-medium">Employee numbers</p>
+            <FieldGrid className="sm:grid-cols-[1fr_1fr_1fr_1.2fr]">
+              <Field
+                label="Prefix"
+                name="employeeNoPrefix"
+                error={errors?.employeeNoPrefix}
+                required
+              >
+                <Input
+                  id="employeeNoPrefix"
+                  name="employeeNoPrefix"
+                  value={empPrefix}
+                  onChange={(e) => setEmpPrefix(e.target.value)}
+                  className="font-mono uppercase"
+                  maxLength={8}
+                  required
+                />
+              </Field>
+              <Field
+                label="Next number"
+                name="employeeNoNext"
+                error={errors?.employeeNoNext}
+                required
+              >
+                <Input
+                  id="employeeNoNext"
+                  name="employeeNoNext"
+                  type="number"
+                  min={1}
+                  value={empNext}
+                  onChange={(e) => setEmpNext(e.target.value)}
+                  className="tabular"
+                  required
+                />
+              </Field>
+              <Field label="Digits" name="employeeNoPad" error={errors?.employeeNoPad} required>
+                <Input
+                  id="employeeNoPad"
+                  name="employeeNoPad"
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={empPad}
+                  onChange={(e) => setEmpPad(e.target.value)}
+                  className="tabular"
+                  required
+                />
+              </Field>
+              <div className="space-y-1.5">
+                <p className="text-[13px] font-medium">Next employee no.</p>
+                <p className="flex h-8 items-center rounded-lg bg-muted px-2.5 font-mono text-sm">
+                  {empPreview}
                 </p>
               </div>
             </FieldGrid>

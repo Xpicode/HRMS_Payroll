@@ -23,6 +23,9 @@ export type CompanyData = {
   slipCodePrefix: string;
   slipCodeNext: number;
   slipCodePad: number;
+  employeeNoPrefix: string;
+  employeeNoNext: number;
+  employeeNoPad: number;
 };
 
 export type PolicyData = {
