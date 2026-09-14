@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Building2Icon,
   CalendarDaysIcon,
+  ClockIcon,
   ContactIcon,
   LayoutDashboardIcon,
   Settings2Icon,
@@ -19,6 +20,7 @@ const ICONS = {
   dashboard: LayoutDashboardIcon,
   holidays: CalendarDaysIcon,
   employees: ContactIcon,
+  attendance: ClockIcon,
   settings: Settings2Icon,
   companies: Building2Icon,
   users: UsersIcon,
