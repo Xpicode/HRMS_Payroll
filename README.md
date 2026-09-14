@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 1** (Phase 0 foundation + employees: 201 records, effective-dated pay settings, recurring items, CSV import).
+Status: **Phase 2** (foundation, employees, and attendance: daily time records, cutoff summary, biometrics import).
 
 ## Run locally from a fresh clone
 
@@ -58,7 +58,7 @@ src/app/                 routes (thin; call module actions/services)
   (auth)/login
   app/                   everything behind login
     (global)/companies, users, account   admin + account screens
-    [companyId]/         dashboard, employees (list, 201 form, pay settings, recurring items, CSV import), holidays, settings
+    [companyId]/         dashboard, employees, attendance (cutoff overview, per-employee DTR grid, biometrics import), holidays, settings
   api/auth, api/files    Auth.js handlers, scoped file serving
 src/modules/<feature>/   schema.ts (Zod) · service.ts (rules) · repo.ts (scoped Prisma) · actions.ts · components/
 src/lib/                 db, scope, session, audit, env, dates, money, csv, password, rate-limit, storage
@@ -93,6 +93,21 @@ docker/                  dev image + entrypoint
 - **Recurring items** are fixed allowances/deductions with an effective range; codes match the Phase 3 pay components.
 - **CSV import**: Employees → Import CSV → download the template → upload → review the preview (errors block, warnings do
   not) → import. All-or-nothing; each employee is created with an initial pay setting and audited.
+
+## Attendance (Phase 2)
+
+- **Cutoffs** follow the company pay frequency: semi-monthly 1–15 and 16–end, or monthly. `cutoffFor` in
+  `src/lib/dates.ts` is the single source of those boundaries; pages refuse arbitrary date ranges.
+- **Day type** defaults per employee per day: holiday calendar (company row beats national; regular beats special) >
+  the employee's rest day (from the pay setting in force) > REGULAR. It can be overridden per day in the grid.
+- **Per-day arithmetic** (`src/modules/attendance/compute.ts`, pure): time in/out derive hours, late (after the policy
+  grace), undertime and suggested OT/night differential using the employee's shift and unpaid break; direct hours are
+  used when there are no punches; nothing typed on a scheduled day is an absence. Typed OT / night-diff override the suggestion.
+- **Cutoff summary** (`summary.ts`, pure; type in `types.ts`) is what the payroll engine reads: days worked, hours and
+  OT by day type (REGULAR, REST_DAY, SPECIAL, REGULAR_HOLIDAY), absences (unrecorded scheduled days count), lates,
+  undertime, night diff, and regular holidays worked / not worked.
+- **Biometrics import**: CSV with employee_no, date, time_in, time_out (several date and time formats accepted; multiple
+  punches on a day are merged). Preview shows the computed figures and errors; imported days replace manual ones.
 
 ## Conventions worth knowing
 
