@@ -108,6 +108,7 @@ model Company {
   employees      Employee[]
   paySettings    EmployeePaySetting[]
   recurringItems EmployeeRecurringItem[]
+  timeRecords    DailyTimeRecord[]
 
   @@map("companies")
 }
@@ -249,6 +250,7 @@ model Employee {
   company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
   paySettings    EmployeePaySetting[]
   recurringItems EmployeeRecurringItem[]
+  timeRecords    DailyTimeRecord[]
 
   @@unique([companyId, employeeNo])
   @@index([companyId, status])
@@ -271,6 +273,12 @@ model EmployeePaySetting {
   philhealthCovered   Boolean      @default(true) @map("philhealth_covered")
   pagibigCovered      Boolean      @default(true) @map("pagibig_covered")
   taxWithheld         Boolean      @default(true) @map("tax_withheld")
+  /// 0 = Sunday … 6 = Saturday. Drives the default REST_DAY day type in attendance.
+  restDayOfWeek       Int          @default(0) @map("rest_day_of_week")
+  /// Scheduled shift ("HH:MM") and unpaid break, used to derive lates/undertime/OT.
+  shiftStart          String       @default("08:00") @map("shift_start")
+  shiftEnd            String       @default("17:00") @map("shift_end")
+  breakMinutes        Int          @default(60) @map("break_minutes")
   note                String?
   createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -303,4 +311,51 @@ model EmployeeRecurringItem {
   @@index([employeeId, effectiveFrom])
   @@index([companyId])
   @@map("employee_recurring_items")
+}
+
+// ---------------------------------------------------------------------------
+// attendance (Phase 2) — one row per employee per day
+// ---------------------------------------------------------------------------
+
+enum DayType {
+  REGULAR
+  REST_DAY
+  SPECIAL_NON_WORKING
+  SPECIAL_WORKING
+  REGULAR_HOLIDAY
+}
+
+enum DtrSource {
+  MANUAL
+  IMPORT
+}
+
+/// Inputs (time in/out) and the computed figures are both stored so the cutoff summary
+/// and the payroll engine read plain columns. Computation lives in src/modules/attendance/compute.ts.
+model DailyTimeRecord {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  employeeId       String    @map("employee_id") @db.Uuid
+  date             DateTime  @db.Date
+  dayType          DayType   @map("day_type")
+  /// "HH:MM" 24-hour; both present = hours/late/undertime derived from them.
+  timeIn           String?   @map("time_in")
+  timeOut          String?   @map("time_out")
+  hoursWorked      Decimal   @default(0) @map("hours_worked") @db.Decimal(5, 2)
+  lateMinutes      Int       @default(0) @map("late_minutes")
+  undertimeMinutes Int       @default(0) @map("undertime_minutes")
+  otHours          Decimal   @default(0) @map("ot_hours") @db.Decimal(5, 2)
+  nightDiffHours   Decimal   @default(0) @map("night_diff_hours") @db.Decimal(5, 2)
+  isAbsent         Boolean   @default(false) @map("is_absent")
+  remarks          String?
+  source           DtrSource @default(MANUAL)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+  @@index([companyId, date])
+  @@map("daily_time_records")
 }
