@@ -54,3 +54,6 @@ next-env.d.ts
 
 # local backups (scripts/backup.sh)
 /backups
+
+# local dev TLS certificate (pnpm dev:https, see README)
+/certificates/

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "next dev -p 8080",
+    "dev:https": "next dev -p 8080 -H 0.0.0.0 --experimental-https --experimental-https-key certificates/dev-key.pem --experimental-https-cert certificates/dev-cert.pem --experimental-https-ca certificates/rootCA.pem",
     "build": "prisma generate && next build",
     "start": "next start -p 8080",
     "typecheck": "prisma generate && next typegen && tsc --noEmit",

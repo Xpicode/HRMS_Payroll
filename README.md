@@ -37,11 +37,19 @@ pnpm db:seed
 pnpm dev                         # http://localhost:8080
 ```
 
+**HTTPS on the LAN** (`pnpm dev:https`): serves `https://localhost:8080` and `https://<this PC's IP>:8080` with a
+local certificate from `certificates/` (git-ignored; generated once with [mkcert](https://github.com/FiloSottile/mkcert)
+for `localhost`, `127.0.0.1`, the PC's hostname and its LAN IP — regenerate if the IP changes). Set
+`AUTH_URL=https://localhost:8080` in `.env` for this mode; with an https `AUTH_URL` the plain `pnpm dev` no longer
+loads its assets, so pick one. Other PCs show a certificate warning until `certificates/rootCA.pem` is installed
+there as a trusted root (double-click → Install Certificate → Current User → Trusted Root Certification Authorities).
+
 ## Scripts
 
 | Script                                   | What it does                                              |
 | ---------------------------------------- | --------------------------------------------------------- |
 | `pnpm dev` / `pnpm build` / `pnpm start` | Next.js dev server / production build / production server |
+| `pnpm dev:https`                         | Dev server over HTTPS on all interfaces (LAN access)      |
 | `pnpm typecheck`                         | Prisma generate + Next typegen + `tsc --noEmit`           |
 | `pnpm lint` / `pnpm format`              | ESLint / Prettier                                         |
 | `pnpm test`                              | Vitest unit tests                                         |
