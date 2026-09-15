@@ -169,6 +169,7 @@ export const payslipListSelect = {
   id: true,
   employeeId: true,
   slipCode: true,
+  pdfPath: true,
   daysWorked: true,
   otHours: true,
   grossPay: true,
@@ -196,6 +197,30 @@ export function listPayslipsForApproval(db: Db, companyId: string, payPeriodId: 
     include: { employee: true },
     orderBy: [{ employee: { lastName: "asc" } }, { employee: { firstName: "asc" } }],
   });
+}
+
+/** Everything the payslip document needs, for a period (documents module). */
+export function listPayslipsWithLines(db: Db, companyId: string, payPeriodId: string) {
+  return db.payslip.findMany({
+    where: { companyId, payPeriodId },
+    include: {
+      lines: { orderBy: { order: "asc" } },
+      employee: true,
+      payPeriod: true,
+    },
+    orderBy: [{ employee: { lastName: "asc" } }, { employee: { firstName: "asc" } }],
+  });
+}
+
+export function getPayslipWithLines(db: Db, companyId: string, id: string) {
+  return db.payslip.findFirst({
+    where: { id, companyId },
+    include: { lines: { orderBy: { order: "asc" } }, employee: true, payPeriod: true },
+  });
+}
+
+export function countPayslips(db: Db, companyId: string, payPeriodId: string) {
+  return db.payslip.count({ where: { companyId, payPeriodId } });
 }
 
 export function getPayslip(db: Db, companyId: string, id: string) {

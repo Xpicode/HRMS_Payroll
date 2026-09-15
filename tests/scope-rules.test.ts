@@ -158,6 +158,7 @@ describe("TENANT_MODELS", () => {
       "EmployeePaySetting",
       "EmployeeRecurringItem",
       "Holiday",
+      "Job",
       "Loan",
       "LoanPayment",
       "PayPeriod",

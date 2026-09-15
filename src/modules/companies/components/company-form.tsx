@@ -41,6 +41,8 @@ export type CompanyFormValues = {
   employeeNoPrefix: string;
   employeeNoNext: number;
   employeeNoPad: number;
+  paperSize: "LETTER" | "A4";
+  paperOrientation: "LANDSCAPE" | "PORTRAIT";
   isActive: boolean;
 };
 
@@ -209,6 +211,34 @@ export function CompanyForm(props: Props) {
                   defaultValue={c?.signatoryTitle ?? "Payroll Officer"}
                   required
                 />
+              </Field>
+            </FieldGrid>
+            <FieldGrid className="mt-4">
+              <Field label="Payslip paper" name="paperSize" error={errors?.paperSize} required>
+                <NativeSelect
+                  id="paperSize"
+                  name="paperSize"
+                  defaultValue={c?.paperSize ?? "LETTER"}
+                >
+                  <option value="LETTER">Letter (8.5 × 11 in)</option>
+                  <option value="A4">A4</option>
+                </NativeSelect>
+              </Field>
+              <Field
+                label="Orientation"
+                name="paperOrientation"
+                error={errors?.paperOrientation}
+                required
+                hint="Landscape fits the employee and admin copies side by side."
+              >
+                <NativeSelect
+                  id="paperOrientation"
+                  name="paperOrientation"
+                  defaultValue={c?.paperOrientation ?? "LANDSCAPE"}
+                >
+                  <option value="LANDSCAPE">Landscape</option>
+                  <option value="PORTRAIT">Portrait</option>
+                </NativeSelect>
               </Field>
             </FieldGrid>
             <FieldGrid className="mt-4 sm:grid-cols-[1fr_1fr_1fr_1.2fr]">

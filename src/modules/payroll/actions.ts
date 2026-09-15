@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getScope } from "@/lib/session";
 import { isUuid } from "@/lib/request";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/lib/action-result";
 import { adjustmentSchema, createPeriodSchema, payDateSchema } from "./schema";
 import * as service from "./service";
+import { enqueuePeriodPdfs, runDueJobs } from "@/modules/documents/service";
 
 function withValues(result: ActionResult, formData?: FormData): ActionResult {
   return result.ok || !formData ? result : { ...result, values: formValues(formData) };
@@ -92,6 +94,14 @@ export async function periodLifecycleAction(
       }
       case "approve": {
         const r = await service.approvePeriod(scope, companyId, periodId);
+        // final PDFs render from the frozen snapshots; queued here, run right after the response.
+        // The approval is already committed — a queue problem must not read as a failed approval.
+        try {
+          await enqueuePeriodPdfs(scope, companyId, periodId);
+          after(() => runDueJobs());
+        } catch (e) {
+          console.error("[payroll] could not queue payslip PDFs after approval", e);
+        }
         message = `approved=${r.payslips}&payments=${r.paymentsPosted}`;
         break;
       }
@@ -173,4 +183,23 @@ export async function removeAdjustmentAction(
   }
   revalidatePath(periodPath(companyId, periodId));
   redirect(`${periodPath(companyId, periodId)}/${payslipId}?adjusted=1`);
+}
+
+/** Queue (draft) PDF generation for a computed period; refused once approved files exist. */
+export async function generatePdfsAction(
+  companyId: string,
+  periodId: string,
+  _prev: ActionResult,
+  _formData: FormData,
+): Promise<ActionResult> {
+  if (!isUuid(companyId) || !isUuid(periodId)) return fail("Invalid request.");
+  try {
+    const scope = await getScope();
+    await enqueuePeriodPdfs(scope, companyId, periodId);
+  } catch (e) {
+    return handleError(e);
+  }
+  after(() => runDueJobs());
+  revalidatePath(periodPath(companyId, periodId));
+  redirect(`${periodPath(companyId, periodId)}?pdfs=1`);
 }

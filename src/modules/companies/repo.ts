@@ -1,7 +1,13 @@
 import "server-only";
 import { scoped, type Scope, type ScopedDb } from "@/lib/scope";
 import { toDateOnly } from "@/lib/dates";
-import type { HolidayType, PayFrequency, StatutoryTiming } from "@/generated/prisma/enums";
+import type {
+  HolidayType,
+  PaperOrientation,
+  PaperSize,
+  PayFrequency,
+  StatutoryTiming,
+} from "@/generated/prisma/enums";
 
 /**
  * All queries here run through `scoped(scope)`. Do not add a function that takes the
@@ -26,6 +32,8 @@ export type CompanyData = {
   employeeNoPrefix: string;
   employeeNoNext: number;
   employeeNoPad: number;
+  paperSize: PaperSize;
+  paperOrientation: PaperOrientation;
 };
 
 export type PolicyData = {

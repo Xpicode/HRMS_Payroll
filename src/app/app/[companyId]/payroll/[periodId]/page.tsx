@@ -8,6 +8,8 @@ import { isUuid } from "@/lib/request";
 import { formatCutoff, formatDateOnly, toIsoDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { canApprove, getPeriod, listPayslips } from "@/modules/payroll/service";
+import { periodPdfStatus } from "@/modules/documents/service";
+import { PdfPanel } from "@/modules/documents/components/pdf-panel";
 import { isFrozen } from "@/modules/payroll/schema";
 import {
   LifecycleButton,
@@ -31,18 +33,21 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Pay period" };
 
-type Search = Record<
-  | "created"
-  | "computed"
-  | "skipped"
-  | "flagged"
-  | "approved"
-  | "payments"
-  | "released"
-  | "locked"
-  | "reverted"
-  | "saved",
-  string | undefined
+type Search = Partial<
+  Record<
+    | "created"
+    | "computed"
+    | "skipped"
+    | "flagged"
+    | "approved"
+    | "payments"
+    | "released"
+    | "locked"
+    | "reverted"
+    | "saved"
+    | "pdfs",
+    string
+  >
 >;
 
 const n2 = (v: { toString(): string }) => {
@@ -65,9 +70,10 @@ export default async function PayPeriodPage({
   const scope = await getScope();
   const period = await getPeriod(scope, companyId, periodId);
   if (!period) notFound();
-  const [payslips, approver] = await Promise.all([
+  const [payslips, approver, pdfs] = await Promise.all([
     listPayslips(scope, companyId, periodId),
     canApprove(scope, companyId, toIsoDate(period.coverageEnd)),
+    periodPdfStatus(scope, companyId, periodId),
   ]);
   const canCompute = roleCan(user.role, "payroll.compute");
   const canRevert = roleCan(user.role, "payroll.revert");
@@ -103,7 +109,9 @@ export default async function PayPeriodPage({
               ? "Period reverted to computed; loan payments reversed."
               : sp.saved === "paydate"
                 ? "Pay date saved."
-                : null;
+                : sp.pdfs
+                  ? "PDF generation queued."
+                  : null;
 
   return (
     <>
@@ -177,6 +185,17 @@ export default async function PayPeriodPage({
           </div>
         </CardContent>
       </Card>
+
+      <div className="mb-6">
+        <PdfPanel
+          companyId={companyId}
+          periodId={periodId}
+          status={pdfs}
+          frozen={frozen}
+          canGenerate={canCompute}
+          hasPayslips={payslips.length > 0}
+        />
+      </div>
 
       {frozen ? (
         <Alert className="mb-4">
@@ -258,14 +277,31 @@ export default async function PayPeriodPage({
                       ))}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        render={<Link href={`${base}/${periodId}/${p.id}`} />}
-                        nativeButton={false}
-                      >
-                        {frozen ? "View" : "Lines & adjust"}
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        {p.pdfPath ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            render={
+                              <a
+                                href={`/api/files/payslips/${companyId}/${periodId}/${p.pdfPath.split("/").pop()}?download=1`}
+                              />
+                            }
+                            nativeButton={false}
+                            aria-label="Download PDF"
+                          >
+                            PDF
+                          </Button>
+                        ) : null}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          render={<Link href={`${base}/${periodId}/${p.id}`} />}
+                          nativeButton={false}
+                        >
+                          {frozen ? "View" : "Lines & adjust"}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

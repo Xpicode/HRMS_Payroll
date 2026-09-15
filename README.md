@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 4** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans).
+Status: **Phase 5** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing).
 
 ## Run locally from a fresh clone
 
@@ -62,6 +62,7 @@ src/app/                 routes (thin; call module actions/services)
     [companyId]/         dashboard, employees, attendance (cutoff overview, per-employee DTR grid, biometrics import), holidays, settings
   api/auth, api/files    Auth.js handlers, scoped file serving
 src/modules/<feature>/   schema.ts (Zod) · service.ts (rules) · repo.ts (scoped Prisma) · actions.ts · components/
+src/modules/documents/  payslip template, PDF renderer (Playwright), jobs queue + worker
 src/lib/                 db, scope, session, audit, env, dates, money, csv, password, rate-limit, storage
 prisma/                  schema, migrations, seed/
 tests/                   Vitest
@@ -175,6 +176,33 @@ docker/                  dev image + entrypoint
 - **Tests**: `pnpm test` covers the engine and schemas; `pnpm test:integration` runs the whole lifecycle (compute →
   adjust → recompute → approve → edits refused by service and trigger → rate change → revert → re-approve → release →
   lock) against the real database with a throw-away company.
+
+## Payslip PDFs and printing (Phase 5)
+
+- **Template** (`src/modules/documents/templates/PayslipPage.tsx`): static HTML reproducing the Excel form — two
+  identical copies per page (EMPLOYEE COPY / ADMIN COPY), logo + address, PAYSLIP / Confidential box, name + slip
+  code, ID rows, pay date / pay type, coverage, daily rate / days / OT, earnings, the fixed deduction rows, the DOLE
+  footnote, net salary, Prepared by / Received by. Data comes from `payslip-data.ts`, a pure mapping of the frozen
+  **snapshot + lines**; unapproved payslips render from the working copy with a DRAFT watermark. Withholding tax gets
+  its own row only when non-zero (it is not on the Excel form); cash advances and manual deductions roll into "Others".
+- **Paper**: Letter or A4, landscape or portrait, per company (Company settings → Payslip paper). The print CSS sets
+  `@page` and breaks after each employee.
+- **Rendering** (`pdf.ts`): Playwright Chromium, one browser per process, renders serialised; `renderHtmlToPdf` and
+  `renderBatch` (all employees, one page each). The Docker image already ships Chromium; on a host run Playwright's
+  browsers must be installed (`pnpm exec playwright install chromium`) or point `PLAYWRIGHT_CHROMIUM_PATH` at one.
+- **Jobs**: the `jobs` table (type, payload, status, attempts, progress, error) and `POST /api/jobs/run` guarded by
+  `JOBS_TOKEN` (constant-time compare). The compose `jobs` sidecar calls it every minute; the app also runs due jobs
+  right after queuing one, so PDFs usually exist within seconds of approval. Failed jobs retry up to 3 times.
+- **`GENERATE_PAYSLIP_PDFS(periodId)`** writes `DATA_DIR/payslips/{companyId}/{periodId}/{slipCode}.pdf` and
+  `_batch.pdf`, records `pdf_path` on each payslip (the one write allowed on a frozen payslip) and shows progress on the
+  period page. Queued automatically on Approve. Below APPROVED, _Generate draft PDFs_ / _Regenerate drafts_ rewrite
+  the files (named by employee number, watermarked); once approved the final files are written once and never
+  regenerated — reprint always serves the stored file.
+- **Buttons** (period page): Preview (live HTML, identical markup to the PDF, any status), Print all (a bare page that
+  embeds `_batch.pdf` and opens the print dialog), Download all, per-row PDF.
+- **Access**: PDFs and previews are served only by `/api/files/payslips/{companyId}/{periodId}/…` after the session,
+  `payroll.view` and company-scope checks; file names are validated against a strict pattern; nothing under `DATA_DIR`
+  is public. A user scoped to company A gets 404 for company B's files.
 
 ## Conventions worth knowing
 

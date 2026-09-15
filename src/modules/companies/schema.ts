@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { HolidayType, PayFrequency, StatutoryTiming } from "@/generated/prisma/enums";
+import {
+  HolidayType,
+  PaperOrientation,
+  PaperSize,
+  PayFrequency,
+  StatutoryTiming,
+} from "@/generated/prisma/enums";
 import { isIsoDate } from "@/lib/dates";
 
 const optionalText = (max: number, pattern?: RegExp, patternMessage?: string) =>
@@ -49,6 +55,8 @@ export const companySchema = z.object({
     .regex(/^[A-Z0-9]{1,8}$/, "1–8 letters or digits, e.g. EMP"),
   employeeNoNext: z.coerce.number().int().min(1).max(999_999),
   employeeNoPad: z.coerce.number().int().min(1).max(6),
+  paperSize: z.enum(PaperSize).default("LETTER"),
+  paperOrientation: z.enum(PaperOrientation).default("LANDSCAPE"),
 });
 export type CompanyInput = z.infer<typeof companySchema>;
 

@@ -439,7 +439,7 @@ describe("pay period lifecycle", () => {
     const second = await payroll.createPeriod(officer, companyId, {
       month: "2026-09",
       half: "1",
-      payDate: null,
+      payDate: "2026-12-31", // far ahead so the release check below stays deterministic
     });
     await payroll.computePeriod(officer, companyId, second.id);
     await prisma.companyPayrollPolicy.updateMany({

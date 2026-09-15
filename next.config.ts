@@ -41,6 +41,8 @@ const nextConfig: NextConfig = {
     "sharp",
     "bcryptjs",
     "tesseract.js", // spawns a worker_thread from its own files; must not be bundled
+    "playwright", // launches Chromium for payslip PDFs
+    "playwright-core",
   ],
   // The OCR engine loads its WASM core and language model by path at runtime, so the
   // standalone build has to carry those files explicitly.

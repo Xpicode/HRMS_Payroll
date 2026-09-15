@@ -68,6 +68,8 @@ export default async function CompanySettingsPage({
               employeeNoPrefix: company.employeeNoPrefix,
               employeeNoNext: company.employeeNoNext,
               employeeNoPad: company.employeeNoPad,
+              paperSize: company.paperSize,
+              paperOrientation: company.paperOrientation,
               isActive: company.isActive,
             }}
           />

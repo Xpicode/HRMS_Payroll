@@ -19,6 +19,10 @@ const schema = z.object({
   ACCOUNT_LOCK_AFTER_FAILURES: z.coerce.number().int().min(1).default(10),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).default(15),
   APP_TZ: z.string().default("Asia/Manila"),
+  /** Bearer token the job runner (compose sidecar / cron) presents to POST /api/jobs/run. */
+  JOBS_TOKEN: z.string().min(24, "JOBS_TOKEN must be at least 24 characters"),
+  /** Where Chromium is launched from for PDF rendering (Playwright default when unset). */
+  PLAYWRIGHT_CHROMIUM_PATH: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

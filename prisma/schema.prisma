@@ -73,6 +73,16 @@ enum PayFrequency {
   MONTHLY
 }
 
+enum PaperSize {
+  LETTER
+  A4
+}
+
+enum PaperOrientation {
+  LANDSCAPE
+  PORTRAIT
+}
+
 enum StatutoryTiming {
   FIRST_CUTOFF
   SECOND_CUTOFF
@@ -80,28 +90,31 @@ enum StatutoryTiming {
 }
 
 model Company {
-  id                   String       @id @default(uuid(7)) @db.Uuid
-  code                 String       @unique
-  legalName            String       @map("legal_name")
-  tradeName            String?      @map("trade_name")
+  id                   String           @id @default(uuid(7)) @db.Uuid
+  code                 String           @unique
+  legalName            String           @map("legal_name")
+  tradeName            String?          @map("trade_name")
   address              String
   tin                  String?
-  sssEmployerNo        String?      @map("sss_employer_no")
-  philhealthEmployerNo String?      @map("philhealth_employer_no")
-  pagibigEmployerNo    String?      @map("pagibig_employer_no")
-  logoPath             String?      @map("logo_path")
-  payFrequency         PayFrequency @default(SEMI_MONTHLY) @map("pay_frequency")
-  signatoryName        String       @map("signatory_name")
-  signatoryTitle       String       @map("signatory_title")
-  slipCodePrefix       String       @map("slip_code_prefix")
-  slipCodeNext         Int          @default(1) @map("slip_code_next")
-  slipCodePad          Int          @default(3) @map("slip_code_pad")
-  employeeNoPrefix     String       @default("EMP") @map("employee_no_prefix")
-  employeeNoNext       Int          @default(1) @map("employee_no_next")
-  employeeNoPad        Int          @default(4) @map("employee_no_pad")
-  isActive             Boolean      @default(true) @map("is_active")
-  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sssEmployerNo        String?          @map("sss_employer_no")
+  philhealthEmployerNo String?          @map("philhealth_employer_no")
+  pagibigEmployerNo    String?          @map("pagibig_employer_no")
+  logoPath             String?          @map("logo_path")
+  payFrequency         PayFrequency     @default(SEMI_MONTHLY) @map("pay_frequency")
+  signatoryName        String           @map("signatory_name")
+  signatoryTitle       String           @map("signatory_title")
+  slipCodePrefix       String           @map("slip_code_prefix")
+  slipCodeNext         Int              @default(1) @map("slip_code_next")
+  slipCodePad          Int              @default(3) @map("slip_code_pad")
+  employeeNoPrefix     String           @default("EMP") @map("employee_no_prefix")
+  employeeNoNext       Int              @default(1) @map("employee_no_next")
+  employeeNoPad        Int              @default(4) @map("employee_no_pad")
+  /// Payslip paper (Phase 5): Letter/A4, landscape/portrait.
+  paperSize            PaperSize        @default(LETTER) @map("paper_size")
+  paperOrientation     PaperOrientation @default(LANDSCAPE) @map("paper_orientation")
+  isActive             Boolean          @default(true) @map("is_active")
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   users          UserCompany[]
   policies       CompanyPayrollPolicy[]
@@ -114,6 +127,7 @@ model Company {
   payPeriods     PayPeriod[]
   payslips       Payslip[]
   loans          Loan[]
+  jobs           Job[]
 
   @@map("companies")
 }
@@ -636,4 +650,46 @@ model LoanPayment {
   @@unique([loanId, payslipId])
   @@index([companyId])
   @@map("loan_payments")
+}
+
+// ---------------------------------------------------------------------------
+// Background jobs — Phase 5 (payslip PDFs). Company-scoped so listings stay tenant-safe;
+// the worker runs them under a system scope.
+// ---------------------------------------------------------------------------
+
+enum JobType {
+  GENERATE_PAYSLIP_PDFS
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+model Job {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  type        JobType
+  payload     Json
+  status      JobStatus @default(QUEUED)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  /// Units done / total (e.g. payslips rendered), for the progress bar.
+  done        Int       @default(0)
+  total       Int       @default(0)
+  error       String?
+  runAt       DateTime  @default(now()) @map("run_at") @db.Timestamptz(3)
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt  DateTime? @map("finished_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAt])
+  @@index([companyId, createdAt])
+  @@map("jobs")
 }

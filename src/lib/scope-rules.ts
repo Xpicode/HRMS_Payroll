@@ -27,6 +27,7 @@ export const TENANT_MODELS: Readonly<Record<string, TenantMode>> = {
   EmployeePaySetting: "strict",
   EmployeeRecurringItem: "strict",
   DailyTimeRecord: "strict",
+  Job: "strict",
   PayPeriod: "strict",
   Payslip: "strict",
   PayslipLine: "strict",

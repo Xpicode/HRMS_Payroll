@@ -1,4 +1,4 @@
-# Local development stack: app (Next.js dev server) + db (PostgreSQL 16).
+# Local development stack: app (Next.js dev server) + db (PostgreSQL 16) + jobs (runner).
 # `docker compose up` on a fresh clone installs dependencies, applies migrations,
 # seeds the first admin and starts the app on http://localhost:8080.
 #
@@ -49,6 +49,25 @@ services:
       - hrms_data:/data
       - hrms_pnpm:/pnpm
     command: ["/app/docker/dev-entrypoint.sh"]
+
+  # Job runner: pokes the app every minute so queued jobs (payslip PDFs) run even when the
+  # request that queued them is gone. Idempotent; the app also runs jobs right after Approve.
+  jobs:
+    image: curlimages/curl:8.14.1
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      JOBS_TOKEN: ${JOBS_TOKEN:?set JOBS_TOKEN in .env}
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          curl -s -o /dev/null -w 'jobs: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer $$JOBS_TOKEN" http://app:8080/api/jobs/run || true
+          sleep 60
+        done
 
 volumes:
   hrms_pgdata:

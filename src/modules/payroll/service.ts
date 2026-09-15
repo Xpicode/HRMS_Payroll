@@ -609,6 +609,46 @@ export async function getPayslip(scope: Scope, companyId: string, payslipId: str
   };
 }
 
+/** Payslips with lines, employee and period rows — the documents module builds print data from these. */
+export async function listPayslipsForDocuments(scope: Scope, companyId: string, periodId: string) {
+  assertPermission(scope, "payroll.view");
+  assertCompanyAccess(scope, companyId);
+  const rows = await repo.listPayslipsWithLines(repo.root(scope), companyId, periodId);
+  return rows.map((r) => ({
+    ...r,
+    computation: r.computation as unknown as StoredComputation,
+    snapshot: r.snapshot as unknown as PayslipSnapshot | null,
+  }));
+}
+
+export async function getPayslipForDocuments(scope: Scope, companyId: string, payslipId: string) {
+  assertPermission(scope, "payroll.view");
+  assertCompanyAccess(scope, companyId);
+  const r = await repo.getPayslipWithLines(repo.root(scope), companyId, payslipId);
+  if (!r) return null;
+  return {
+    ...r,
+    computation: r.computation as unknown as StoredComputation,
+    snapshot: r.snapshot as unknown as PayslipSnapshot | null,
+  };
+}
+
+export async function countPayslips(scope: Scope, companyId: string, periodId: string) {
+  assertCompanyAccess(scope, companyId);
+  return repo.countPayslips(repo.root(scope), companyId, periodId);
+}
+
+/** Record where a payslip's PDF was written — the only write allowed on a frozen payslip. */
+export async function markPayslipPdf(
+  scope: Scope,
+  companyId: string,
+  payslipId: string,
+  pdfPath: string,
+) {
+  assertCompanyAccess(scope, companyId);
+  await repo.setPayslipPdf(repo.root(scope), companyId, payslipId, pdfPath);
+}
+
 export async function listAdjustments(
   scope: Scope,
   companyId: string,
