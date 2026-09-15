@@ -4,9 +4,14 @@ import { notFound } from "next/navigation";
 import { CheckCircle2Icon, CircleDashedIcon } from "lucide-react";
 import { getScope, requireCompany } from "@/lib/session";
 import { roleCan } from "@/lib/permissions";
-import { todayInManila } from "@/lib/dates";
+import { formatCutoff, formatDateOnly, todayInManila, toIsoDate } from "@/lib/dates";
 import { getCompany, listHolidays } from "@/modules/companies/service";
 import { PAY_FREQUENCY_LABELS, STATUTORY_TIMING_LABELS } from "@/modules/companies/schema";
+import { headcount } from "@/modules/employees/service";
+import { countPendingRequests, listRequests } from "@/modules/leave/service";
+import { latestPeriod } from "@/modules/payroll/service";
+import { PERIOD_STATUS_LABELS } from "@/modules/payroll/schema";
+import { countActiveJobs } from "@/modules/documents/service";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { CompanyMark } from "@/components/company-mark";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,12 +25,19 @@ export default async function CompanyDashboard({
   params: Promise<{ companyId: string }>;
 }) {
   const { companyId } = await params;
-  const { user } = await requireCompany(companyId);
+  const { user, company: summary } = await requireCompany(companyId);
   const scope = await getScope();
   const year = Number(todayInManila().slice(0, 4));
-  const [company, holidays] = await Promise.all([
+  const canPayroll = roleCan(user.role, "payroll.view");
+  const canLeave = roleCan(user.role, "leave.view");
+  const [company, holidays, counts, period, pendingLeave, pendingList, jobs] = await Promise.all([
     getCompany(scope, companyId),
     listHolidays(scope, companyId, year),
+    headcount(scope, companyId),
+    canPayroll ? latestPeriod(scope, companyId) : null,
+    canLeave ? countPendingRequests(scope, companyId) : 0,
+    canLeave ? listRequests(scope, companyId, { status: "PENDING", take: 5 }) : [],
+    countActiveJobs(scope, companyId),
   ]);
   if (!company) notFound();
 
@@ -33,6 +45,7 @@ export default async function CompanyDashboard({
   const canEdit = roleCan(user.role, "companies.update");
   const nextSlip = `${company.slipCodePrefix}-${String(company.slipCodeNext).padStart(company.slipCodePad, "0")}`;
   const companyHolidays = holidays.filter((h) => h.companyId === companyId).length;
+  const base = `/app/${companyId}`;
 
   const checklist = [
     { label: "Company header and address", done: true },
@@ -45,14 +58,14 @@ export default async function CompanyDashboard({
   return (
     <>
       <PageHeader
-        eyebrow={company.code}
+        eyebrow={summary.code}
         title={company.tradeName ?? company.legalName}
         description={company.address}
         actions={
           canEdit ? (
             <Button
               variant="outline"
-              render={<Link href={`/app/${companyId}/settings`} />}
+              render={<Link href={`${base}/settings`} />}
               nativeButton={false}
             >
               Company settings
@@ -60,6 +73,45 @@ export default async function CompanyDashboard({
           ) : null
         }
       />
+
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          label="Headcount"
+          value={String(counts.ACTIVE + counts.ON_LEAVE)}
+          sub={`${counts.ACTIVE} active · ${counts.ON_LEAVE} on leave · ${counts.SEPARATED} separated`}
+          href={`${base}/employees`}
+        />
+        <Stat
+          label="Current pay period"
+          value={period ? PERIOD_STATUS_LABELS[period.status] : canPayroll ? "None yet" : "—"}
+          sub={
+            period
+              ? `${formatCutoff({
+                  start: toIsoDate(period.coverageStart),
+                  end: toIsoDate(period.coverageEnd),
+                  sequenceInMonth: period.sequenceInMonth === 2 ? 2 : 1,
+                })} · pay ${formatDateOnly(period.payDate)}`
+              : canPayroll
+                ? "Create one under Payroll"
+                : "Payroll officers only"
+          }
+          href={
+            canPayroll ? (period ? `${base}/payroll/${period.id}` : `${base}/payroll`) : undefined
+          }
+        />
+        <Stat
+          label="Pending leave requests"
+          value={canLeave ? String(pendingLeave) : "—"}
+          sub={pendingLeave > 0 ? "Waiting for approval" : "Nothing waiting"}
+          href={canLeave ? `${base}/leave` : undefined}
+          className={pendingLeave > 0 ? "text-warning" : undefined}
+        />
+        <Stat
+          label="Jobs in progress"
+          value={String(jobs)}
+          sub={jobs > 0 ? "PDFs or credit rollover running" : "Queue is idle"}
+        />
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
@@ -113,6 +165,42 @@ export default async function CompanyDashboard({
           </CardContent>
         </Card>
 
+        {canLeave && pendingList.length > 0 ? (
+          <Card className="md:col-span-3">
+            <CardHeader>
+              <CardTitle>Waiting for approval</CardTitle>
+              <CardDescription>The oldest pending leave requests.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="divide-y text-sm">
+                {pendingList.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span>
+                      <Link
+                        href={`${base}/employees/${r.employee.id}/leave`}
+                        className="font-medium hover:underline"
+                      >
+                        {r.employee.lastName}, {r.employee.firstName}
+                      </Link>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {r.leaveType.name} · {formatDateOnly(toIsoDate(r.startDate))}
+                        {toIsoDate(r.endDate) !== toIsoDate(r.startDate)
+                          ? ` – ${formatDateOnly(toIsoDate(r.endDate))}`
+                          : ""}
+                        {r.withPay ? "" : " · without pay"}
+                      </span>
+                    </span>
+                    <Link href={`${base}/leave`} className="text-xs underline">
+                      Review
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <Stat label="Pay frequency" value={PAY_FREQUENCY_LABELS[company.payFrequency]} />
         <Stat label="Next slip code" value={nextSlip} mono />
         <Stat label="Signatory" value={company.signatoryName} sub={company.signatoryTitle} />
@@ -125,7 +213,7 @@ export default async function CompanyDashboard({
           label={`Holidays ${year}`}
           value={String(holidays.length)}
           sub={`${holidays.length - companyHolidays} national · ${companyHolidays} company`}
-          href={`/app/${companyId}/holidays?year=${year}`}
+          href={`${base}/holidays?year=${year}`}
         />
         <Stat
           label="Your role here"

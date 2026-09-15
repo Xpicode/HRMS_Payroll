@@ -45,6 +45,8 @@ export function summarizeCutoff(input: SummaryInput): CutoffSummary {
   let nightDiffHours = 0;
   let regularHolidaysNotWorked = 0;
   let regularHolidaysWorked = 0;
+  let leaveWithPayDays = 0;
+  let leaveWithoutPayDays = 0;
 
   for (const day of input.days) {
     // A stored row may carry an overridden day type (e.g. a swapped rest day).
@@ -54,6 +56,20 @@ export function summarizeCutoff(input: SummaryInput): CutoffSummary {
     if (scheduled) scheduledDays++;
 
     const r = day.record;
+
+    // Approved leave: with pay is paid like a day worked (no hours, no lates); without pay
+    // is an absence the office expected, so it never counts as "unrecorded".
+    if (dayType === "LEAVE_WITH_PAY" || dayType === "LEAVE_WITHOUT_PAY") {
+      if (dayType === "LEAVE_WITH_PAY") {
+        leaveWithPayDays++;
+        daysWorkedByType.REGULAR += 1;
+      } else {
+        leaveWithoutPayDays++;
+        absentDays++;
+      }
+      continue;
+    }
+
     const worked = r !== null && !r.isAbsent && (r.hoursWorked > 0 || r.otHours > 0);
 
     if (worked) {
@@ -97,6 +113,8 @@ export function summarizeCutoff(input: SummaryInput): CutoffSummary {
     nightDiffHours: round2(nightDiffHours),
     regularHolidaysNotWorked,
     regularHolidaysWorked,
+    leaveWithPayDays,
+    leaveWithoutPayDays,
   };
 }
 

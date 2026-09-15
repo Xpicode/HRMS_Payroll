@@ -69,6 +69,8 @@ export const DAY_TYPE_LABELS: Record<DayType, string> = {
   SPECIAL_NON_WORKING: "Special non-working",
   SPECIAL_WORKING: "Special working",
   REGULAR_HOLIDAY: "Regular holiday",
+  LEAVE_WITH_PAY: "Leave with pay",
+  LEAVE_WITHOUT_PAY: "Leave without pay",
 };
 
 export const DAY_TYPE_SHORT: Record<DayType, string> = {
@@ -77,6 +79,8 @@ export const DAY_TYPE_SHORT: Record<DayType, string> = {
   SPECIAL_NON_WORKING: "SNW",
   SPECIAL_WORKING: "SW",
   REGULAR_HOLIDAY: "RH",
+  LEAVE_WITH_PAY: "LWP",
+  LEAVE_WITHOUT_PAY: "LWOP",
 };
 
 // ---------------------------------------------------------------------------

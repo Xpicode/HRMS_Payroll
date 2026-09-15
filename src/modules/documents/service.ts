@@ -59,6 +59,7 @@ async function documentFor(
     return buildPayslipDocument({
       slipCode: snap.slipCode,
       draft: false,
+      finalPay: snap.finalPay ?? slip.finalPay,
       company: snap.company,
       logoDataUrl: logo,
       employee: snap.employee,
@@ -80,6 +81,7 @@ async function documentFor(
   return buildPayslipDocument({
     slipCode: slip.slipCode,
     draft: true,
+    finalPay: slip.finalPay,
     company: liveCompany,
     logoDataUrl: logo,
     employee,
@@ -290,3 +292,6 @@ export async function readPayslipPdf(
 
 /** Run queued jobs now (called right after an action queues one, and by the worker). */
 export const runDueJobs = jobs.runDueJobs;
+
+/** Queued or running jobs of a company (dashboard). */
+export const countActiveJobs = jobs.countActiveJobs;

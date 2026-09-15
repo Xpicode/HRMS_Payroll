@@ -75,6 +75,8 @@ export function summary(partial: Partial<CutoffSummary> = {}): CutoffSummary {
     nightDiffHours: 0,
     regularHolidaysNotWorked: 0,
     regularHolidaysWorked: 0,
+    leaveWithPayDays: 0,
+    leaveWithoutPayDays: 0,
     ...partial,
   };
 }

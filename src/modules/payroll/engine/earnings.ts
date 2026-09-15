@@ -56,9 +56,11 @@ export function computeBasic(
       paySetting.payFrequency === "SEMI_MONTHLY" ? round2(monthly.dividedBy(2)) : round2(monthly);
     const absences = round2(rates.dailyRate.times(summary.absentDays));
     const half = paySetting.payFrequency === "SEMI_MONTHLY" ? "½ of " : "";
+    const lwop =
+      summary.leaveWithoutPayDays > 0 ? ` incl. ${summary.leaveWithoutPayDays} leave w/o pay` : "";
     const note =
       summary.absentDays > 0
-        ? `${half}${formatMoney(monthly)} less ${summary.absentDays} absence(s) × ${formatMoney(rates.dailyRate)}`
+        ? `${half}${formatMoney(monthly)} less ${summary.absentDays} absence(s)${lwop} × ${formatMoney(rates.dailyRate)}`
         : `${half}${formatMoney(monthly)}`;
     return earning("BASIC", "Basic pay", periodPay.minus(absences), {
       rate: monthly.toFixed(2),

@@ -1,5 +1,5 @@
 import type { DayType } from "@/generated/prisma/enums";
-import { isScheduledWorkDay, type Shift } from "./types";
+import { isLeaveDay, isScheduledWorkDay, type Shift } from "./types";
 
 /**
  * Pure per-day attendance arithmetic. Shared by the server (source of truth on save)
@@ -95,8 +95,10 @@ const ZERO: ComputedDay = {
  * - Direct hours (no in/out): hours up to hours-per-day are regular, excess is OT unless OT
  *   was typed; late/undertime/night-diff are whatever was typed.
  * - Nothing at all: absent on scheduled days, an ordinary non-working day otherwise.
+ * - Approved leave days carry no hours, lates or absence flag; the summary prices them.
  */
 export function computeDay(entry: DayEntry, shift: Shift): ComputedDay {
+  if (isLeaveDay(entry.dayType)) return { ...ZERO };
   if (entry.isAbsent) return { ...ZERO, isAbsent: true };
 
   const inMin = parseHHMM(entry.timeIn);

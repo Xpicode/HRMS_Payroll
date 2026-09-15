@@ -93,6 +93,19 @@ export function listPeriods(scope: Scope, companyId: string) {
   });
 }
 
+/** Approved/released/locked periods that overlap a date range (attendance there is closed). */
+export function findFrozenOverlapping(db: Db, companyId: string, start: string, end: string) {
+  return db.payPeriod.findFirst({
+    where: {
+      companyId,
+      status: { in: ["APPROVED", "RELEASED", "LOCKED"] },
+      coverageStart: { lte: toDateOnly(end) },
+      coverageEnd: { gte: toDateOnly(start) },
+    },
+    select: { id: true, coverageStart: true, coverageEnd: true, status: true },
+  });
+}
+
 export function latestPeriod(db: Db, companyId: string) {
   return db.payPeriod.findFirst({ where: { companyId }, orderBy: { coverageStart: "desc" } });
 }
@@ -170,6 +183,7 @@ export const payslipListSelect = {
   employeeId: true,
   slipCode: true,
   pdfPath: true,
+  finalPay: true,
   daysWorked: true,
   otHours: true,
   grossPay: true,
@@ -247,6 +261,7 @@ export function findPayslipByEmployee(
 }
 
 export type PayslipRow = {
+  finalPay: boolean;
   daysWorked: string;
   otHours: string;
   grossPay: string;

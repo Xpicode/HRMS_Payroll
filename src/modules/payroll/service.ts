@@ -319,6 +319,23 @@ export async function listPeriods(scope: Scope, companyId: string) {
   return repo.listPeriods(scope, companyId);
 }
 
+/** The most recent period (by coverage start), for the dashboard. */
+export async function latestPeriod(scope: Scope, companyId: string) {
+  assertCompanyAccess(scope, companyId);
+  return repo.latestPeriod(repo.root(scope), companyId);
+}
+
+/** True when any approved (or later) period covers part of the range. Used by leave. */
+export async function hasFrozenPeriodOverlapping(
+  scope: Scope,
+  companyId: string,
+  start: string,
+  end: string,
+) {
+  assertCompanyAccess(scope, companyId);
+  return (await repo.findFrozenOverlapping(repo.root(scope), companyId, start, end)) !== null;
+}
+
 export async function getPeriod(scope: Scope, companyId: string, periodId: string) {
   assertPermission(scope, "payroll.view");
   assertCompanyAccess(scope, companyId);
@@ -465,10 +482,21 @@ function computeOne(
   return { input, output };
 }
 
-function payslipRows(c: StoredComputation): { row: repo.PayslipRow; lines: repo.LineRow[] } {
+/** The employee's separation date falls inside the cutoff: this is the last payslip. */
+function isFinalPay(employee: { separationDate: Date | null }, cutoff: Cutoff): boolean {
+  if (!employee.separationDate) return false;
+  const sep = toIsoDate(employee.separationDate);
+  return sep >= cutoff.start && sep <= cutoff.end;
+}
+
+function payslipRows(
+  c: StoredComputation,
+  finalPay: boolean,
+): { row: repo.PayslipRow; lines: repo.LineRow[] } {
   const o = c.output;
   return {
     row: {
+      finalPay,
       daysWorked: String(c.input.summary.daysWorked),
       otHours: String(c.input.summary.otHours),
       grossPay: o.gross,
@@ -557,7 +585,7 @@ export async function computePeriod(
         skipped++;
         continue;
       }
-      const { row, lines } = payslipRows(c);
+      const { row, lines } = payslipRows(c, isFinalPay(e, cutoff));
       await repo.upsertPayslip(tx, companyId, periodId, e.id, row, lines);
       computed++;
       if (c.output.flags.length) flagged++;
@@ -750,6 +778,8 @@ export type PayslipSnapshot = {
   period: EngineInput["period"] & { payDate: string; id: string };
   computation: StoredComputation;
   loanPayments: PostedPayment[];
+  /** Last payslip of a separated employee (Phase 6; absent on older snapshots). */
+  finalPay?: boolean;
 };
 
 async function requireApprover(scope: Scope, companyId: string, coverageEnd: string) {
@@ -837,6 +867,7 @@ export async function approvePeriod(scope: Scope, companyId: string, periodId: s
         period: { ...computation.input.period, payDate: toIsoDate(period.payDate), id: periodId },
         computation,
         loanPayments,
+        finalPay: slip.finalPay,
       };
       await repo.freezePayslip(tx, companyId, slip.id, {
         slipCode,

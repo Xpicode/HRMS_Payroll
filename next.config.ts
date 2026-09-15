@@ -67,7 +67,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "4mb", // logo uploads
+      bodySizeLimit: "10mb", // logo uploads (2 MB) and 201 attachments (8 MB)
     },
   },
   async headers() {

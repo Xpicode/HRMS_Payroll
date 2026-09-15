@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export type EmployeeTab = "details" | "pay" | "recurring" | "loans";
+export type EmployeeTab = "details" | "pay" | "recurring" | "loans" | "leave" | "documents";
 
 export function EmployeeTabs({
   companyId,
@@ -20,6 +20,8 @@ export function EmployeeTabs({
     { key: "pay", label: "Pay settings", href: `${base}/pay` },
     { key: "recurring", label: "Recurring items", href: `${base}/recurring` },
     ...(showLoans ? [{ key: "loans" as const, label: "Loans", href: `${base}/loans` }] : []),
+    { key: "leave", label: "Leave", href: `${base}/leave` },
+    { key: "documents", label: "Documents", href: `${base}/documents` },
   ];
   return (
     <nav className="mb-6 flex gap-1 border-b" aria-label="Employee sections">

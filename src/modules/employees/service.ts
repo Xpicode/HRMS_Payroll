@@ -3,7 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { audit } from "@/lib/audit";
 import { AppError, NeedsConfirmError } from "@/lib/action-result";
 import { parseCsv, toCsv } from "@/lib/csv";
-import { toDateOnly, todayInManila } from "@/lib/dates";
+import { toDateOnly, toIsoDate, todayInManila } from "@/lib/dates";
 import { assertCompanyAccess, type Scope } from "@/lib/scope";
 import { assertPermission } from "@/lib/session";
 import { getCompany } from "@/modules/companies/service";
@@ -21,6 +21,7 @@ import {
   type ImportPayload,
   type PaySettingInput,
   type RecurringItemInput,
+  type SeparationInput,
 } from "./schema";
 
 function isUniqueViolation(e: unknown): e is Prisma.PrismaClientKnownRequestError {
@@ -86,6 +87,22 @@ export async function listEmployeesForPayroll(
   assertPermission(scope, "employees.view");
   assertCompanyAccess(scope, companyId);
   return repo.listForPayroll(scope, companyId, toDateOnly(start), toDateOnly(end));
+}
+
+/** Brief rows of everyone not separated (leave requests, credit rollover). */
+export async function listEmployeesForLeave(scope: Scope, companyId: string) {
+  assertPermission(scope, "employees.view");
+  assertCompanyAccess(scope, companyId);
+  return repo.listNotSeparated(scope, companyId);
+}
+
+/** Headcount by status for the dashboard. */
+export async function headcount(scope: Scope, companyId: string) {
+  assertCompanyAccess(scope, companyId);
+  const rows = await repo.countByStatus(scope, companyId);
+  const out = { ACTIVE: 0, ON_LEAVE: 0, SEPARATED: 0 };
+  for (const r of rows) out[r.status] = r._count._all;
+  return out;
 }
 
 export async function listDepartments(scope: Scope, companyId: string) {
@@ -174,6 +191,71 @@ export async function updateEmployee(
     if (isUniqueViolation(e)) throw employeeNoError();
     throw e;
   }
+}
+
+/**
+ * Separation (Phase 6): dated and audited. The employee stays in the pay period that contains
+ * the date (that payslip is marked final pay) and drops out of every later one.
+ */
+export async function separateEmployee(
+  scope: Scope,
+  companyId: string,
+  id: string,
+  input: SeparationInput,
+) {
+  assertPermission(scope, "employees.separate");
+  assertCompanyAccess(scope, companyId);
+  const before = await repo.getEmployee(scope, companyId, id);
+  if (!before) throw new AppError("Employee not found.");
+  if (before.status === "SEPARATED") throw new AppError("The employee is already separated.");
+  if (input.separationDate < toIsoDate(before.hireDate))
+    throw new AppError("The separation date is before the hire date.", {
+      separationDate: ["Before the hire date"],
+    });
+  return repo.transaction(scope, async (tx) => {
+    const after = await repo.setSeparation(tx, companyId, id, {
+      status: "SEPARATED",
+      separationDate: toDateOnly(input.separationDate),
+    });
+    await audit(
+      "Employee",
+      id,
+      "UPDATE",
+      { status: before.status, separationDate: before.separationDate },
+      { status: after.status, separationDate: after.separationDate, reason: input.reason },
+      { scope, companyId, tx },
+    );
+    return after;
+  });
+}
+
+/** ADMIN only: undo a separation (e.g. entered on the wrong employee). */
+export async function reinstateEmployee(
+  scope: Scope,
+  companyId: string,
+  id: string,
+  reason: string,
+) {
+  assertPermission(scope, "employees.reinstate");
+  assertCompanyAccess(scope, companyId);
+  const before = await repo.getEmployee(scope, companyId, id);
+  if (!before) throw new AppError("Employee not found.");
+  if (before.status !== "SEPARATED") throw new AppError("The employee is not separated.");
+  return repo.transaction(scope, async (tx) => {
+    const after = await repo.setSeparation(tx, companyId, id, {
+      status: "ACTIVE",
+      separationDate: null,
+    });
+    await audit(
+      "Employee",
+      id,
+      "UPDATE",
+      { status: before.status, separationDate: before.separationDate },
+      { status: after.status, separationDate: null, reason },
+      { scope, companyId, tx },
+    );
+    return after;
+  });
 }
 
 export async function addPaySetting(

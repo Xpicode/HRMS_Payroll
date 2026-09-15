@@ -314,6 +314,7 @@ describe("pay period lifecycle", () => {
           periodId,
           employeeDailyId,
           {
+            finalPay: false,
             daysWorked: "0",
             otHours: "0",
             grossPay: "0",

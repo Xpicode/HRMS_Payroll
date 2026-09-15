@@ -16,6 +16,8 @@ export type PayslipDocumentInput = {
   slipCode: string | null;
   /** true before approval: rendered from the working copy with a DRAFT mark. */
   draft: boolean;
+  /** Last payslip of a separated employee: printed with a FINAL PAY mark. */
+  finalPay?: boolean;
   company: { legalName: string; tradeName: string | null; address: string };
   logoDataUrl: string | null;
   employee: {
@@ -45,6 +47,7 @@ export type PayslipRow = { label: string; amount: string };
 export type PayslipDocument = {
   slipCode: string;
   draft: boolean;
+  finalPay: boolean;
   company: { name: string; address: string; logoDataUrl: string | null };
   employee: {
     name: string;
@@ -138,6 +141,7 @@ export function buildPayslipDocument(input: PayslipDocumentInput): PayslipDocume
   return {
     slipCode: input.slipCode ?? "—",
     draft: input.draft,
+    finalPay: input.finalPay ?? false,
     company: {
       name: input.company.tradeName ?? input.company.legalName,
       address: input.company.address,

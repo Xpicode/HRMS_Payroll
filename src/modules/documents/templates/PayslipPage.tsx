@@ -35,7 +35,7 @@ function copy(doc: PayslipDocument, title: string): string {
   <div class="copy-title">${e(title)}</div>
   <div class="head">
     <div class="brand">${brand}<div class="address">${e(doc.company.address)}</div></div>
-    <div class="payslip-box"><div class="payslip-word">PAYSLIP</div><div class="confidential">Confidential</div></div>
+    <div class="payslip-box"><div class="payslip-word">PAYSLIP</div><div class="confidential">Confidential</div>${doc.finalPay ? `<div class="final-pay">FINAL PAY</div>` : ""}</div>
   </div>
   <div class="band"><span>${e(doc.employee.name)}</span><span class="slip">SLIP CODE: ${e(doc.slipCode)}</span></div>
   <div class="ids">
@@ -138,6 +138,7 @@ export function payslipStyles(paper: Paper): string {
   .sign-title { font-weight: 600; font-size: 8.5pt; margin-bottom: 14pt; }
   .sign-name { font-weight: 700; font-size: 9pt; border-bottom: 0.75pt solid ${BLACK}; display: inline-block; min-width: 1.6in; padding: 0 6pt 1pt; }
   .sign-sub { font-size: 8pt; margin-top: 2pt; }
+  .final-pay { margin-top: 2pt; font-size: 7pt; font-weight: 700; letter-spacing: 1pt; color: #b91c1c; }
   .draft { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transform: rotate(-24deg); font-size: 30pt; font-weight: 700; color: rgba(200, 30, 30, 0.14); pointer-events: none; letter-spacing: 2pt; }
   @media screen { body { background: #e5e5e5; padding: 12px; } .sheet { background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.25); margin: 0 auto 12px; width: ${paperW}in; padding: 0.4in; } }
   `;

@@ -31,9 +31,21 @@ export function dayTypeGroup(t: DayType): DayTypeGroup {
   }
 }
 
-/** A day is "scheduled" when absence on it costs pay: regular days and special working days. */
+/**
+ * A day is "scheduled" when absence on it costs pay: regular days and special working days.
+ * Approved leave replaces a scheduled day, so both leave types are scheduled too.
+ */
 export function isScheduledWorkDay(t: DayType): boolean {
-  return t === "REGULAR" || t === "SPECIAL_WORKING";
+  return (
+    t === "REGULAR" ||
+    t === "SPECIAL_WORKING" ||
+    t === "LEAVE_WITH_PAY" ||
+    t === "LEAVE_WITHOUT_PAY"
+  );
+}
+
+export function isLeaveDay(t: DayType): boolean {
+  return t === "LEAVE_WITH_PAY" || t === "LEAVE_WITHOUT_PAY";
 }
 
 /** One employee-day as stored (or as computed before storing). */
@@ -78,6 +90,10 @@ export type CutoffSummary = {
   regularHolidaysNotWorked: number;
   /** Regular holidays in the cutoff on which the employee worked. */
   regularHolidaysWorked: number;
+  /** Approved leave with pay: paid like a day worked (included in daysWorked). */
+  leaveWithPayDays: number;
+  /** Approved leave without pay: an absence that was expected (included in absentDays, not unrecorded). */
+  leaveWithoutPayDays: number;
 };
 
 /** Shift parameters used to derive lates, undertime and OT from time in/out. */

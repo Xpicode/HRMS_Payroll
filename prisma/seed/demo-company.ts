@@ -36,6 +36,25 @@ export async function seedDemoCompany(prisma: PrismaClient) {
       employeeNoPrefix: "DEMO",
       employeeNoNext: 6,
       policies: { create: { effectiveFrom: d("2026-01-01") } },
+      leaveTypes: {
+        create: [
+          {
+            code: "VL",
+            name: "Vacation leave",
+            withPayDefault: true,
+            annualCredits: "5",
+            maxCarryover: "0",
+          },
+          {
+            code: "SL",
+            name: "Sick leave",
+            withPayDefault: true,
+            annualCredits: "5",
+            maxCarryover: "0",
+          },
+          { code: "LWOP", name: "Leave without pay", withPayDefault: false, annualCredits: "0" },
+        ],
+      },
     },
   });
 

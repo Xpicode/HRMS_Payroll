@@ -47,6 +47,9 @@ model User {
   auditLogs       AuditLog[]
   approvedPeriods PayPeriod[]         @relation("PayPeriodApprovedBy")
   adjustments     PayrollAdjustment[]
+  leaveRequests   LeaveRequest[]      @relation("LeaveRequestEncodedBy")
+  leaveDecisions  LeaveRequest[]      @relation("LeaveRequestDecidedBy")
+  uploadedFiles   EmployeeDocument[]
 
   @@map("users")
 }
@@ -128,6 +131,10 @@ model Company {
   payslips       Payslip[]
   loans          Loan[]
   jobs           Job[]
+  leaveTypes     LeaveType[]
+  leaveBalances  LeaveBalance[]
+  leaveRequests  LeaveRequest[]
+  documents      EmployeeDocument[]
 
   @@map("companies")
 }
@@ -275,6 +282,9 @@ model Employee {
   payslips       Payslip[]
   adjustments    PayrollAdjustment[]
   loans          Loan[]
+  leaveBalances  LeaveBalance[]
+  leaveRequests  LeaveRequest[]
+  documents      EmployeeDocument[]
 
   @@unique([companyId, employeeNo])
   @@index([companyId, status])
@@ -347,12 +357,17 @@ enum DayType {
   SPECIAL_NON_WORKING
   SPECIAL_WORKING
   REGULAR_HOLIDAY
+  /// Approved leave (Phase 6): with pay counts as a day worked, without pay as an absence.
+  LEAVE_WITH_PAY
+  LEAVE_WITHOUT_PAY
 }
 
 enum DtrSource {
   MANUAL
   IMPORT
   SCAN
+  /// Written by an approved leave request; removed again when the request is cancelled.
+  LEAVE
 }
 
 /// Inputs (time in/out) and the computed figures are both stored so the cutoff summary
@@ -529,6 +544,8 @@ model Payslip {
   computation     Json
   pdfPath         String?   @map("pdf_path")
   generatedAt     DateTime? @map("generated_at") @db.Timestamptz(3)
+  /// The employee's separation date falls in this period: last payslip (Phase 6).
+  finalPay        Boolean   @default(false) @map("final_pay")
   computedAt      DateTime  @default(now()) @map("computed_at") @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -659,6 +676,7 @@ model LoanPayment {
 
 enum JobType {
   GENERATE_PAYSLIP_PDFS
+  LEAVE_CREDIT_ROLLOVER
 }
 
 enum JobStatus {
@@ -692,4 +710,115 @@ model Job {
   @@index([status, runAt])
   @@index([companyId, createdAt])
   @@map("jobs")
+}
+
+// ---------------------------------------------------------------------------
+// Leave (Phase 6)
+// ---------------------------------------------------------------------------
+
+model LeaveType {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  code           String
+  name           String
+  withPayDefault Boolean  @default(true) @map("with_pay_default")
+  /// Credits (days) granted per calendar year.
+  annualCredits  Decimal  @default(0) @map("annual_credits") @db.Decimal(5, 2)
+  /// Unused credits carried into the next year by the rollover job, at most this many days.
+  maxCarryover   Decimal  @default(0) @map("max_carryover") @db.Decimal(5, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  balances LeaveBalance[]
+  requests LeaveRequest[]
+
+  @@unique([companyId, code])
+  @@map("leave_types")
+}
+
+model LeaveBalance {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  leaveTypeId String   @map("leave_type_id") @db.Uuid
+  year        Int
+  credits     Decimal  @default(0) @db.Decimal(6, 2)
+  used        Decimal  @default(0) @db.Decimal(6, 2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([companyId, year])
+  @@map("leave_balances")
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveRequest {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  companyId    String             @map("company_id") @db.Uuid
+  employeeId   String             @map("employee_id") @db.Uuid
+  leaveTypeId  String             @map("leave_type_id") @db.Uuid
+  startDate    DateTime           @map("start_date") @db.Date
+  endDate      DateTime           @map("end_date") @db.Date
+  /// Scheduled working days in the range (rest days and holidays excluded).
+  days         Decimal            @default(0) @db.Decimal(5, 2)
+  withPay      Boolean            @map("with_pay")
+  reason       String?
+  status       LeaveRequestStatus @default(PENDING)
+  encodedById  String?            @map("encoded_by") @db.Uuid
+  decidedById  String?            @map("decided_by") @db.Uuid
+  decidedAt    DateTime?          @map("decided_at") @db.Timestamptz(3)
+  decisionNote String?            @map("decision_note")
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  encodedBy User?     @relation("LeaveRequestEncodedBy", fields: [encodedById], references: [id], onDelete: SetNull)
+  decidedBy User?     @relation("LeaveRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status, startDate])
+  @@index([employeeId, startDate])
+  @@map("leave_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Employee 201 attachments (Phase 6)
+// ---------------------------------------------------------------------------
+
+model EmployeeDocument {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  employeeId   String   @map("employee_id") @db.Uuid
+  /// Original name as uploaded (display only; the stored file is named by id).
+  fileName     String   @map("file_name")
+  /// Detected from the bytes, never from the browser.
+  mimeType     String   @map("mime_type")
+  size         Int
+  /// Optional label: Contract, Government ID, Clearance…
+  category     String?
+  /// Relative to DATA_DIR: employees/{employeeId}/{id}.{ext}
+  storagePath  String   @map("storage_path")
+  uploadedById String?  @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  uploadedBy User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([employeeId, createdAt])
+  @@map("employee_documents")
 }

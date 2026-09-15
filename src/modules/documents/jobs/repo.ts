@@ -16,15 +16,34 @@ export function createJob(
   return scoped(scope).job.create({ data });
 }
 
-/** A queued or running job of the same type for the same period, if any (dedupe). */
-export function findActiveJob(scope: Scope, companyId: string, type: JobType, periodId: string) {
+/** A queued or running job of the same type with the same payload, if any (dedupe). */
+export function findActiveJob(
+  scope: Scope,
+  companyId: string,
+  type: JobType,
+  payload: Prisma.InputJsonValue,
+) {
   return scoped(scope).job.findFirst({
-    where: {
-      companyId,
-      type,
-      status: { in: ["QUEUED", "RUNNING"] },
-      payload: { path: ["periodId"], equals: periodId },
-    },
+    where: { companyId, type, status: { in: ["QUEUED", "RUNNING"] }, payload: { equals: payload } },
+  });
+}
+
+export function latestJobForPayload(
+  scope: Scope,
+  companyId: string,
+  type: JobType,
+  payload: Prisma.InputJsonValue,
+) {
+  return scoped(scope).job.findFirst({
+    where: { companyId, type, payload: { equals: payload } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+/** Queued or running jobs of a company (dashboard). */
+export function countActive(scope: Scope, companyId: string) {
+  return scoped(scope).job.count({
+    where: { companyId, status: { in: ["QUEUED", "RUNNING"] } },
   });
 }
 

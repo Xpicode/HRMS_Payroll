@@ -58,6 +58,47 @@ describe("resolveDayType", () => {
   });
 });
 
+describe("summarizeCutoff — approved leave (Phase 6)", () => {
+  it("leave with pay counts as a day worked; leave without pay as an expected absence", () => {
+    const records: Record<string, AttendanceDay> = {};
+    for (const d of eachDay(START, END))
+      if (typeOn(d) === "REGULAR") records[d] = rec(d, { hoursWorked: 8 });
+    // 18 Aug approved leave with pay, 19–20 Aug leave without pay
+    records["2026-08-18"] = rec("2026-08-18", { dayType: "LEAVE_WITH_PAY" });
+    records["2026-08-19"] = rec("2026-08-19", { dayType: "LEAVE_WITHOUT_PAY" });
+    records["2026-08-20"] = rec("2026-08-20", { dayType: "LEAVE_WITHOUT_PAY" });
+    const s = summarizeCutoff({
+      employeeId: "c",
+      employeeNo: "C",
+      coverageStart: START,
+      coverageEnd: END,
+      days: days(records),
+    });
+    expect(s.scheduledDays).toBe(11);
+    expect(s.daysWorked).toBe(9); // 8 worked + 1 leave with pay
+    expect(s.daysWorkedByType.REGULAR).toBe(9);
+    expect(s.hoursWorkedByType.REGULAR).toBe(64); // leave days carry no hours
+    expect(s.leaveWithPayDays).toBe(1);
+    expect(s.leaveWithoutPayDays).toBe(2);
+    expect(s.absentDays).toBe(2);
+    expect(s.unrecordedDays).toBe(0); // the office expected them
+  });
+
+  it("a leave row on a day that was a rest day is still priced as leave (stored type wins)", () => {
+    const records: Record<string, AttendanceDay> = {};
+    records["2026-08-23"] = rec("2026-08-23", { dayType: "LEAVE_WITH_PAY" });
+    const s = summarizeCutoff({
+      employeeId: "d",
+      employeeNo: "D",
+      coverageStart: START,
+      coverageEnd: END,
+      days: days(records),
+    });
+    expect(s.leaveWithPayDays).toBe(1);
+    expect(s.scheduledDays).toBe(12);
+  });
+});
+
 describe("summarizeCutoff — 16–31 Aug 2026", () => {
   it("counts the calendar correctly with nothing encoded", () => {
     const s = summarizeCutoff({

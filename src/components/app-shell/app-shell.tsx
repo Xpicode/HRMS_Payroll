@@ -20,6 +20,7 @@ function buildNav(user: CurrentUser, company: CompanySummary | null) {
         { href: `/app/${company.id}`, label: "Dashboard", icon: "dashboard", exact: true },
         { href: `/app/${company.id}/employees`, label: "Employees", icon: "employees" },
         { href: `/app/${company.id}/attendance`, label: "Attendance", icon: "attendance" },
+        { href: `/app/${company.id}/leave`, label: "Leave", icon: "leave" },
         { href: `/app/${company.id}/holidays`, label: "Holidays", icon: "holidays" },
         ...(roleCan(user.role, "payroll.compute")
           ? [{ href: `/app/${company.id}/payroll`, label: "Payroll", icon: "payroll" as const }]

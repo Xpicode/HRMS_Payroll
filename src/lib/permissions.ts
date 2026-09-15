@@ -26,6 +26,18 @@ export const PERMISSIONS = {
   "payroll.revert": ["ADMIN"],
   "loans.view": ["ADMIN", "PAYROLL_OFFICER"],
   "loans.manage": ["ADMIN", "PAYROLL_OFFICER"],
+  /** Leave (Phase 6): anyone may view and encode requests; deciding and credits are HR/payroll. */
+  "leave.view": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
+  "leave.request": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
+  "leave.approve": ["ADMIN", "PAYROLL_OFFICER"],
+  "leave.manage_types": ["ADMIN", "PAYROLL_OFFICER"],
+  "leave.adjust_credits": ["ADMIN", "PAYROLL_OFFICER"],
+  /** 201 attachments (Phase 6). */
+  "documents.view": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
+  "documents.manage": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
+  /** Separation is a dated, audited HR action; reinstating is admin-only. */
+  "employees.separate": ["ADMIN", "PAYROLL_OFFICER"],
+  "employees.reinstate": ["ADMIN"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

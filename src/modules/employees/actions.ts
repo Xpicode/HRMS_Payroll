@@ -20,6 +20,8 @@ import {
   endRecurringItemSchema,
   paySettingSchema,
   recurringItemSchema,
+  reinstateSchema,
+  separationSchema,
 } from "./schema";
 import * as service from "./service";
 
@@ -80,6 +82,44 @@ export async function updateEmployeeAction(
   }
   revalidatePath(`/app/${companyId}/employees`);
   return success("Employee saved.");
+}
+
+export async function separateEmployeeAction(
+  companyId: string,
+  employeeId: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!isUuid(companyId) || !isUuid(employeeId)) return fail("Invalid request.");
+  const parsed = separationSchema.safeParse(formToObject(formData));
+  if (!parsed.success) return withValues(invalid(parsed.error), formData);
+  try {
+    const scope = await getScope();
+    await service.separateEmployee(scope, companyId, employeeId, parsed.data);
+  } catch (e) {
+    return withValues(handleError(e), formData);
+  }
+  revalidatePath(`/app/${companyId}/employees`);
+  redirect(`/app/${companyId}/employees/${employeeId}?separated=1`);
+}
+
+export async function reinstateEmployeeAction(
+  companyId: string,
+  employeeId: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!isUuid(companyId) || !isUuid(employeeId)) return fail("Invalid request.");
+  const parsed = reinstateSchema.safeParse(formToObject(formData));
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    const scope = await getScope();
+    await service.reinstateEmployee(scope, companyId, employeeId, parsed.data.reason);
+  } catch (e) {
+    return handleError(e);
+  }
+  revalidatePath(`/app/${companyId}/employees`);
+  redirect(`/app/${companyId}/employees/${employeeId}?reinstated=1`);
 }
 
 export async function addPaySettingAction(

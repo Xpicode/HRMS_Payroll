@@ -9,14 +9,19 @@ export function transaction<T>(scope: Scope, fn: (tx: ScopedTx) => Promise<T>): 
   return scoped(scope).$transaction(fn);
 }
 
-/** Employees to show for a cutoff: hired by the end, not separated before the start. */
+/**
+ * Employees to show for a cutoff: hired by its end and not separated before its start. An
+ * employee separated inside the cutoff stays (their final pay is computed from it).
+ */
 export function listEmployeesForRange(scope: Scope, companyId: string, start: string, end: string) {
   return scoped(scope).employee.findMany({
     where: {
       companyId,
-      status: { not: "SEPARATED" },
       hireDate: { lte: toDateOnly(end) },
-      OR: [{ separationDate: null }, { separationDate: { gte: toDateOnly(start) } }],
+      OR: [
+        { separationDate: null, status: { not: "SEPARATED" } },
+        { separationDate: { gte: toDateOnly(start) } },
+      ],
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     include: { paySettings: { orderBy: { effectiveFrom: "desc" } } },
@@ -110,6 +115,24 @@ export async function saveRecords(
     }
   }
   return { created, updated };
+}
+
+/** Rows written by approved leave in a range (removed when the request is cancelled). */
+export function deleteLeaveRecords(
+  tx: ScopedTx,
+  companyId: string,
+  employeeId: string,
+  start: string,
+  end: string,
+) {
+  return tx.dailyTimeRecord.deleteMany({
+    where: {
+      companyId,
+      employeeId,
+      source: "LEAVE",
+      date: { gte: toDateOnly(start), lte: toDateOnly(end) },
+    },
+  });
 }
 
 /** Policy in force on a date (latest effective_from <= date). */

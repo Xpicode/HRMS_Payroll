@@ -48,6 +48,7 @@ const SOURCE_LABELS: Record<DtrSource, string | null> = {
   MANUAL: null,
   IMPORT: "imported",
   SCAN: "scanned",
+  LEAVE: "approved leave",
 };
 
 function rowFrom(d: GridDayProp): Row {
@@ -88,6 +89,8 @@ const ROW_TINT: Partial<Record<DayType, string>> = {
   REST_DAY: "bg-muted/60",
   REGULAR_HOLIDAY: "bg-brand/10",
   SPECIAL_NON_WORKING: "bg-brand/5",
+  LEAVE_WITH_PAY: "bg-success/5",
+  LEAVE_WITHOUT_PAY: "bg-warning/10",
 };
 
 const HINT_TEXT: Record<DtrRowHint["level"], string> = {

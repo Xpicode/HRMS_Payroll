@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 5** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing).
+Status: **Phase 6** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing, leave with credits, 201 attachments, separation / final pay, company dashboard).
 
 ## Run locally from a fresh clone
 
@@ -203,6 +203,46 @@ docker/                  dev image + entrypoint
 - **Access**: PDFs and previews are served only by `/api/files/payslips/{companyId}/{periodId}/…` after the session,
   `payroll.view` and company-scope checks; file names are validated against a strict pattern; nothing under `DATA_DIR`
   is public. A user scoped to company A gets 404 for company B's files.
+
+## Leave, 201 attachments, separation and dashboard (Phase 6)
+
+- **Leave types** (`Leave → Leave types and credits`, ADMIN / PAYROLL_OFFICER): per company — code, name, with-pay
+  default, credits per year, max carry-over, active flag. _Add the standard set_ creates VL 5 / SL 5 / LWOP for a
+  company with none. The demo company ships with them.
+- **Requests** (`Leave`, every role can view and encode; ADMIN / PAYROLL_OFFICER approve): employee, type, dates,
+  with/without pay, reason. `days` = the employee's scheduled working days in the range (rest days and holidays are
+  skipped; days already worked or already on leave are refused). Statuses PENDING → APPROVED / REJECTED / CANCELLED,
+  each with who decided and a note. Overlapping requests are refused.
+- **Approval writes attendance**: one `DailyTimeRecord` per working day with day type `LEAVE_WITH_PAY` or
+  `LEAVE_WITHOUT_PAY`, source `LEAVE`, remarks = the leave type (+ reason). The cutoff summary counts leave with pay as
+  a day worked (no hours, no lates) and leave without pay as an absence that is _not_ "unrecorded"; the engine then
+  pays a daily employee for the day / deducts a monthly employee's derived daily rate (`incl. N leave w/o pay` in the
+  basic-pay note). Dates inside an approved pay period cannot be approved or undone. Cancelling an approved request
+  removes its leave rows and returns the credits. The grid shows the rows tinted with an "approved leave" tag; an
+  encoder may also pick the leave day types by hand.
+- **Credits**: `LeaveBalance(employee, type, year, credits, used)`. Leave with pay takes `days` from the year of the
+  start date and is refused when the remaining credits are short ("approve it as leave without pay" or adjust). A
+  balance is created with the type's annual credits on first use; **Adjust credits** (employee → Leave tab, signed
+  change + reason) is audited. **Yearly rollover** (`LEAVE_CREDIT_ROLLOVER(year)` job, queued from the types page,
+  run by the jobs runner): every non-separated employee gets each active type's annual credits plus unused credits of
+  the previous year up to the type's cap; existing rows for the year are skipped, so re-running is safe; every
+  allocation is an audit row.
+- **201 attachments** (employee → Documents tab): PDF / JPEG / PNG / WebP up to 8 MB, type decided from the bytes
+  (never the browser), stored as `DATA_DIR/employees/{employeeId}/{documentId}.{ext}` and served only by
+  `/api/files/employees/{companyId}/{employeeId}/{documentId}` after the session and company-scope checks, inline
+  with a sandboxing CSP or as a download. Upload and delete are audited.
+- **Separation** (employee → Details, ADMIN / PAYROLL_OFFICER): date + reason, audited; sets `separation_date` and
+  status SEPARATED. The employee stays in the pay period that contains the date — that payslip carries `final_pay`
+  (badge on the period page, **FINAL PAY** on the printed slip, kept in the snapshot) — and is excluded from later
+  periods, attendance and leave. Days after the separation date (and before the hire date) count as plain absences in
+  the summary, so a monthly employee's last basic is prorated and no holiday pay accrues. **Reinstate** (ADMIN only,
+  reason) undoes a separation entered by mistake.
+- **Dashboard**: headcount by status, the latest pay period and its status, pending leave requests (with the oldest
+  five listed), jobs queued or running, plus the setup checklist from Phase 0.
+- **Tests**: `tests/payroll-engine/leave-without-pay.test.ts` (monthly basic 17,500.00 − 1,341.85; daily paid /
+  unpaid), leave cases in `tests/attendance-summary.test.ts`, `tests/leave-attachments-schema.test.ts` (type sniffing,
+  schemas), and `tests/integration/leave.test.ts` (the acceptance: an approved LWOP request reduces the next run;
+  credits, refusal, cancel, rollover, separation / final pay, scoped attachments).
 
 ## Conventions worth knowing
 

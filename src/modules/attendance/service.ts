@@ -4,7 +4,7 @@ import { audit } from "@/lib/audit";
 import { AppError } from "@/lib/action-result";
 import { parseCsv } from "@/lib/csv";
 import { dayOfWeek, daysInMonth, eachDay, toDateOnly, toIsoDate, type Cutoff } from "@/lib/dates";
-import { assertCompanyAccess, type Scope } from "@/lib/scope";
+import { assertCompanyAccess, type Scope, type ScopedTx } from "@/lib/scope";
 import { assertPermission } from "@/lib/session";
 import { getLimiter } from "@/lib/rate-limit";
 import { getCompany, listHolidaysInRange } from "@/modules/companies/service";
@@ -12,6 +12,7 @@ import * as repo from "./repo";
 import { parseCard, type CardWord } from "./card-layout";
 import { CARD_IMAGE_MAX_BYTES, recognizeCard } from "./ocr";
 import { computeDay, DEFAULT_SHIFT, round2, type DayEntry } from "./compute";
+import { isLeaveDay, isScheduledWorkDay } from "./types";
 import { resolveDayType, summarizeCutoff, type SummaryDay } from "./summary";
 import {
   BIOMETRICS_COLUMNS,
@@ -109,6 +110,38 @@ function defaultDayType(ctx: CutoffContext, date: string, setting: PaySettingLik
   return resolveDayType(holiday, dayOfWeek(date) === restDay);
 }
 
+/**
+ * Days before the hire date or after the separation date are not the employee's to work:
+ * scheduled days and holidays there count as plain absences (so a monthly employee's basic is
+ * prorated and no holiday pay accrues), rest days stay rest days.
+ */
+function employmentDay(
+  employee: { hireDate: Date; separationDate: Date | null },
+  date: string,
+  dayType: DayType,
+  record: AttendanceDay | null,
+): SummaryDay {
+  const hired = toIsoDate(employee.hireDate);
+  const separated = employee.separationDate ? toIsoDate(employee.separationDate) : null;
+  if (date >= hired && (separated === null || date <= separated)) return { date, dayType, record };
+  const notEmployed: AttendanceDay = {
+    date,
+    dayType: "REGULAR",
+    timeIn: null,
+    timeOut: null,
+    hoursWorked: 0,
+    lateMinutes: 0,
+    undertimeMinutes: 0,
+    otHours: 0,
+    nightDiffHours: 0,
+    isAbsent: true,
+    remarks: date < hired ? "Before hire date" : "After separation",
+  };
+  return dayType === "REST_DAY"
+    ? { date, dayType, record: null }
+    : { date, dayType: "REGULAR", record: notEmployed };
+}
+
 function toAttendanceDay(r: {
   date: Date;
   dayType: DayType;
@@ -172,11 +205,14 @@ export async function cutoffOverview(scope: Scope, companyId: string, cutoff: Cu
   }
   const rows: EmployeeCutoffRow[] = employees.map((e) => {
     const recs = byEmployee.get(e.id) ?? new Map<string, AttendanceDay>();
-    const days: SummaryDay[] = ctx.days.map((date) => ({
-      date,
-      dayType: defaultDayType(ctx, date, paySettingOn(e.paySettings, date)),
-      record: recs.get(date) ?? null,
-    }));
+    const days: SummaryDay[] = ctx.days.map((date) =>
+      employmentDay(
+        e,
+        date,
+        defaultDayType(ctx, date, paySettingOn(e.paySettings, date)),
+        recs.get(date) ?? null,
+      ),
+    );
     const summary = summarizeCutoff({
       employeeId: e.id,
       employeeNo: e.employeeNo,
@@ -259,11 +295,9 @@ export async function employeeDtr(
   const ctx = await loadContext(scope, companyId, cutoff);
   const records = await repo.listRecords(scope, companyId, cutoff.start, cutoff.end, employeeId);
   const days = gridDays(employee.paySettings, ctx, records);
-  const summaryDays: SummaryDay[] = days.map((d) => ({
-    date: d.date,
-    dayType: d.defaultDayType,
-    record: d.record,
-  }));
+  const summaryDays: SummaryDay[] = days.map((d) =>
+    employmentDay(employee, d.date, d.defaultDayType, d.record),
+  );
   const summary = summarizeCutoff({
     employeeId,
     employeeNo: employee.employeeNo,
@@ -377,6 +411,92 @@ export async function saveEmployeeDtr(
     );
     return result;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Leave (Phase 6): the leave module plans and writes leave days through these
+// ---------------------------------------------------------------------------
+
+export type LeaveCalendarDay = {
+  date: string;
+  /** The day type the leave would replace (holiday / rest day / regular). */
+  dayType: DayType;
+  /** A working day for this employee (regular or special working, inside employment). */
+  scheduled: boolean;
+  /** Attendance with hours or OT is already recorded. */
+  worked: boolean;
+  /** Already a leave day (from another approved request or encoded by hand). */
+  onLeave: boolean;
+};
+
+/** One entry per calendar day of a range, for planning a leave request. */
+export async function leaveCalendar(
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+  start: string,
+  end: string,
+): Promise<LeaveCalendarDay[]> {
+  assertPermission(scope, "attendance.view");
+  assertCompanyAccess(scope, companyId);
+  const employee = await repo.getEmployeeWithPaySettings(scope, companyId, employeeId);
+  if (!employee) throw new AppError("Employee not found.");
+  const ctx = await loadContext(scope, companyId, { start, end, sequenceInMonth: 1 });
+  const records = await repo.listRecords(scope, companyId, start, end, employeeId);
+  const hired = toIsoDate(employee.hireDate);
+  const separated = employee.separationDate ? toIsoDate(employee.separationDate) : null;
+  return gridDays(employee.paySettings, ctx, records).map((d) => {
+    const stored = d.record?.dayType;
+    const onLeave = stored !== undefined && isLeaveDay(stored);
+    const dayType = onLeave ? d.defaultDayType : (stored ?? d.defaultDayType);
+    const employed = d.date >= hired && (separated === null || d.date <= separated);
+    return {
+      date: d.date,
+      dayType,
+      scheduled: employed && isScheduledWorkDay(dayType),
+      worked:
+        d.record !== null &&
+        !d.record.isAbsent &&
+        (d.record.hoursWorked > 0 || d.record.otHours > 0),
+      onLeave,
+    };
+  });
+}
+
+/** Write one leave row per date (source LEAVE), replacing empty or absent rows. */
+export async function writeLeaveRecords(
+  tx: ScopedTx,
+  companyId: string,
+  employeeId: string,
+  rows: { date: string; dayType: "LEAVE_WITH_PAY" | "LEAVE_WITHOUT_PAY"; remarks: string }[],
+) {
+  const recordRows: repo.RecordRow[] = rows.map((r) => ({
+    date: toDateOnly(r.date),
+    dayType: r.dayType,
+    timeIn: null,
+    timeOut: null,
+    hoursWorked: 0,
+    lateMinutes: 0,
+    undertimeMinutes: 0,
+    otHours: 0,
+    nightDiffHours: 0,
+    isAbsent: false,
+    remarks: r.remarks,
+    source: "LEAVE",
+  }));
+  return repo.saveRecords(tx, companyId, employeeId, recordRows);
+}
+
+/** Remove the leave rows of a cancelled request; returns how many were removed. */
+export async function removeLeaveRecords(
+  tx: ScopedTx,
+  companyId: string,
+  employeeId: string,
+  start: string,
+  end: string,
+): Promise<number> {
+  const r = await repo.deleteLeaveRecords(tx, companyId, employeeId, start, end);
+  return r.count;
 }
 
 // ---------------------------------------------------------------------------

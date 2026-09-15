@@ -189,6 +189,17 @@ export const PAY_TYPE_LABELS: Record<PayType, string> = {
   COMMISSION: "Commission",
 };
 
+/** Separation flow (Phase 6). */
+export const separationSchema = z.object({
+  separationDate: isoDate,
+  reason: z.string().trim().min(3, "Give a reason").max(200),
+});
+export type SeparationInput = z.infer<typeof separationSchema>;
+
+export const reinstateSchema = z.object({
+  reason: z.string().trim().min(3, "Give a reason").max(200),
+});
+
 export const EMPLOYEE_STATUS_LABELS: Record<EmployeeStatus, string> = {
   ACTIVE: "Active",
   ON_LEAVE: "On leave",

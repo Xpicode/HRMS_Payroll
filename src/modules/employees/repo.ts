@@ -137,6 +137,24 @@ export async function listDepartments(scope: Scope, companyId: string): Promise<
   return rows.map((r) => r.department!).filter(Boolean);
 }
 
+/** Employees who can take leave / receive credits: everyone not separated. */
+export function listNotSeparated(scope: Scope, companyId: string) {
+  return scoped(scope).employee.findMany({
+    where: { companyId, status: { not: "SEPARATED" } },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: { id: true, employeeNo: true, lastName: true, firstName: true, department: true },
+  });
+}
+
+export function setSeparation(
+  db: Db,
+  companyId: string,
+  id: string,
+  data: { status: EmployeeStatus; separationDate: Date | null },
+) {
+  return db.employee.update({ where: { id, companyId }, data });
+}
+
 export function countByStatus(scope: Scope, companyId: string) {
   return scoped(scope).employee.groupBy({
     by: ["status"],

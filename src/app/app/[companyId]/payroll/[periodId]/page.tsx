@@ -243,6 +243,11 @@ export default async function PayPeriodPage({
                       <p className="text-xs text-muted-foreground">
                         <span className="font-mono">{p.employee.employeeNo}</span>
                         {p.employee.department ? ` · ${p.employee.department}` : ""}
+                        {p.finalPay ? (
+                          <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive uppercase">
+                            final pay
+                          </span>
+                        ) : null}
                       </p>
                     </TableCell>
                     <TableCell className="font-mono text-xs">{p.slipCode ?? "—"}</TableCell>

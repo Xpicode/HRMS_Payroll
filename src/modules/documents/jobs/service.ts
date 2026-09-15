@@ -33,6 +33,10 @@ async function handlerFor(type: JobType): Promise<JobHandler> {
       const mod = await import("../service");
       return mod.generatePayslipPdfsJob;
     }
+    case "LEAVE_CREDIT_ROLLOVER": {
+      const mod = await import("@/modules/leave/service");
+      return mod.rolloverJob;
+    }
   }
 }
 
@@ -63,16 +67,16 @@ const view = (j: Awaited<ReturnType<typeof repo.getJob>>): JobView | null =>
       }
     : null;
 
-/** Queue a job unless an identical one is already queued or running for the period. */
+/** Queue a job unless one with the same type and payload is already queued or running. */
 export async function enqueue(
   scope: Scope,
   companyId: string,
   type: JobType,
-  payload: { periodId: string } & Record<string, Prisma.InputJsonValue>,
+  payload: Record<string, Prisma.InputJsonValue>,
   total = 0,
 ): Promise<JobView> {
   assertCompanyAccess(scope, companyId);
-  const existing = await repo.findActiveJob(scope, companyId, type, payload.periodId);
+  const existing = await repo.findActiveJob(scope, companyId, type, payload);
   if (existing) return view(existing)!;
   const job = await repo.createJob(scope, {
     companyId,
@@ -93,6 +97,22 @@ export async function latestForPeriod(
 ): Promise<JobView | null> {
   assertCompanyAccess(scope, companyId);
   return view(await repo.latestJobForPeriod(scope, companyId, type, periodId));
+}
+
+export async function latestForPayload(
+  scope: Scope,
+  companyId: string,
+  type: JobType,
+  payload: Record<string, Prisma.InputJsonValue>,
+): Promise<JobView | null> {
+  assertCompanyAccess(scope, companyId);
+  return view(await repo.latestJobForPayload(scope, companyId, type, payload));
+}
+
+/** Queued or running jobs of a company (dashboard). */
+export async function countActiveJobs(scope: Scope, companyId: string) {
+  assertCompanyAccess(scope, companyId);
+  return repo.countActive(scope, companyId);
 }
 
 const RETRY_DELAY_MS = 60_000;
