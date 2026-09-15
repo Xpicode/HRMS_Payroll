@@ -1,15 +1,28 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { BuildingIcon, FileCheckIcon, LandmarkIcon, ShieldCheckIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { safeRelativePath } from "@/lib/request";
 import { LoginForm } from "@/modules/auth/components/login-form";
 import { AmbientBackground } from "@/components/app-shell/ambient-background";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { ThemeSegment } from "@/components/theme-toggle";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 type Search = { callbackUrl?: string; expired?: string; changed?: string };
 
+const FEATURES = [
+  { icon: BuildingIcon, label: "Multi-company", detail: "only your companies" },
+  { icon: FileCheckIcon, label: "Frozen payslips", detail: "immutable on approval" },
+  { icon: LandmarkIcon, label: "Statutory-ready", detail: "SSS · PhilHealth · HDMF · BIR" },
+];
+
+/**
+ * Sign-in: a single centred stage. The ambient canvas (light pools, grid, noise) fills the
+ * page; the form sits in a spotlight card that lights up under the cursor. No side panel, so
+ * the same composition works from a phone to an ultrawide.
+ */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const user = await getCurrentUser();
@@ -22,68 +35,71 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       : null;
 
   return (
-    <main className="grid min-h-svh lg:grid-cols-[1.1fr_1fr]">
-      <section className="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-10 text-sidebar-foreground lg:flex">
-        <AmbientBackground intensity="hero" position="absolute" />
-        <div className="relative flex items-center gap-2 animate-fade-in">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary font-heading text-base font-bold text-sidebar-primary-foreground shadow-[0_0_32px_-6px_var(--sidebar-primary),inset_0_1px_0_0_rgba(255,255,255,0.25)]">
+    <main className="relative flex min-h-svh flex-col overflow-hidden">
+      <AmbientBackground intensity="hero" />
+
+      <header className="relative z-10 flex items-center justify-between px-5 py-4 sm:px-8 sm:py-6 animate-fade-in">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary font-heading text-base font-bold text-primary-foreground shadow-[0_0_28px_-6px_var(--primary),inset_0_1px_0_0_rgba(255,255,255,0.25)]">
             U
           </span>
-          <span className="font-semibold">HRMS Payroll</span>
+          <span className="text-sm font-semibold tracking-tight">HRMS Payroll</span>
         </div>
-        <div className="stagger relative max-w-lg [--stagger-step:90ms]">
-          <p className="eyebrow flex items-center gap-2 text-sidebar-muted">
+        <ThemeSegment />
+      </header>
+
+      <section className="relative z-10 flex flex-1 items-center justify-center px-5 pb-12 sm:px-8">
+        <div className="stagger w-full max-w-[28rem] [--stagger-step:90ms]">
+          <p className="eyebrow flex items-center justify-center gap-2">
             <span
-              className="size-1.5 rounded-full bg-sidebar-primary shadow-[0_0_8px_var(--sidebar-primary)]"
+              className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]"
               aria-hidden
             />
             Internal system
           </p>
-          <h1 className="text-gradient mt-4 text-5xl leading-[1.05] font-semibold tracking-[-0.03em] text-balance xl:text-6xl">
-            One login. Only the companies{" "}
-            <span className="text-accent-shimmer">you are assigned to</span>.
+          <h1 className="text-gradient mt-4 text-center text-4xl leading-[1.05] font-semibold tracking-[-0.03em] text-balance sm:text-5xl">
+            Welcome back
           </h1>
-          <p className="mt-5 max-w-md text-base leading-relaxed text-sidebar-muted">
-            Employee records, attendance and Philippine payroll for every Upright company, with
-            payslips that never change once approved.
+          <p className="mx-auto mt-3 max-w-xs text-center text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Sign in with the account your administrator created for you.
           </p>
-          <ul className="mt-7 flex flex-wrap gap-2 text-xs text-sidebar-foreground/85">
-            {["Multi-company", "Immutable payslips", "SSS · PhilHealth · Pag-IBIG · BIR"].map(
-              (t) => (
-                <li
-                  key={t}
-                  className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 backdrop-blur-sm"
-                >
-                  {t}
-                </li>
-              ),
-            )}
+
+          <SpotlightCard
+            interactive={false}
+            className="mt-8 p-6 sm:p-7 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_20px_rgba(0,0,0,0.5),0_0_80px_-20px_rgba(94,106,210,0.35)]"
+          >
+            <div className="relative z-10">
+              <LoginForm callbackUrl={safeRelativePath(sp.callbackUrl, "/app")} notice={notice} />
+            </div>
+          </SpotlightCard>
+
+          <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            <ShieldCheckIcon className="size-3.5 text-success" />
+            Confidential. Every sign-in is logged.
+          </p>
+
+          <ul className="mt-10 grid gap-2 sm:grid-cols-3">
+            {FEATURES.map((f) => (
+              <li
+                key={f.label}
+                className="surface flex items-center gap-3 rounded-xl px-3 py-2.5 sm:flex-col sm:items-start sm:gap-1.5 sm:px-3.5 sm:py-3"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+                  <f.icon className="size-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-medium">{f.label}</span>
+                  <span className="block text-[11px] text-muted-foreground">{f.detail}</span>
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
-        <p className="relative text-xs text-sidebar-muted animate-fade-in">
-          Confidential. Access is logged.
-        </p>
       </section>
-      <section className="relative flex items-center justify-center p-6 sm:p-10">
-        <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
-          <ThemeSegment />
-        </div>
-        <div className="stagger w-full max-w-sm [--stagger-step:70ms]">
-          <div className="mb-8 flex items-center gap-2 lg:hidden">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary font-heading text-sm font-bold text-primary-foreground">
-              U
-            </span>
-            <span className="text-sm font-semibold">HRMS Payroll</span>
-          </div>
-          <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Use the account your administrator created for you.
-          </p>
-          <div className="surface rounded-2xl p-6">
-            <LoginForm callbackUrl={safeRelativePath(sp.callbackUrl, "/app")} notice={notice} />
-          </div>
-        </div>
-      </section>
+
+      <footer className="relative z-10 px-5 pb-5 text-center text-[11px] text-muted-foreground/70 sm:px-8 animate-fade-in">
+        Upright · HRMS &amp; Philippine payroll
+      </footer>
     </main>
   );
 }
