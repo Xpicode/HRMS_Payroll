@@ -105,7 +105,9 @@ export default async function EmployeeDtrPage({
         />
       </div>
       <DtrGrid
-        key={dtr.version}
+        // The grid keeps its rows in state; remount it per employee + cutoff + data version
+        // (two empty cutoffs share the same version, so the cutoff must be part of the key).
+        key={`${employeeId}:${cutoff.start}:${cutoff.end}:${dtr.version}`}
         companyId={companyId}
         employeeId={employeeId}
         start={cutoff.start}

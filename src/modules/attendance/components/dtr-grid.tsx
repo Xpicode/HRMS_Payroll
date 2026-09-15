@@ -130,7 +130,12 @@ export function DtrGrid({
   );
   const shifts = useMemo(() => new Map(days.map((d) => [d.date, d.shift])), [days]);
 
-  const results = useMemo(() => rows.map((r) => computed(r, shifts.get(r.date)!)), [rows, shifts]);
+  // Rows and days always come from the same cutoff (the parent keys the grid on it); the
+  // fallback only guards against a stale row so a bad key can never crash the page.
+  const results = useMemo(
+    () => rows.map((r) => computed(r, shifts.get(r.date) ?? days[0]!.shift)),
+    [rows, shifts, days],
+  );
   const summary = useMemo(
     () =>
       summarizeCutoff({
