@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CompanySwitcher } from "./company-switcher";
 import { UserMenu } from "./user-menu";
 import { NavSection, type NavItem } from "./nav";
+import { PageTransition } from "./page-transition";
 import type { CompanySummary, CurrentUser } from "@/lib/session";
 import { roleCan } from "@/lib/permissions";
 
@@ -53,8 +54,8 @@ function SidebarBody({ user, currentCompany }: Omit<Props, "children">) {
   const { companyItems, adminItems } = buildNav(user, currentCompany);
   return (
     <div className="flex h-full flex-col gap-5 p-3">
-      <Link href="/app" className="flex items-center gap-2 px-1 pt-1">
-        <span className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary font-heading text-sm font-bold text-sidebar-primary-foreground">
+      <Link href="/app" className="group flex items-center gap-2 px-1 pt-1">
+        <span className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary font-heading text-sm font-bold text-sidebar-primary-foreground shadow-[0_0_0_0_var(--sidebar-primary)] transition-[transform,box-shadow] duration-300 group-hover:rotate-[-6deg] group-hover:shadow-[0_0_24px_-6px_var(--sidebar-primary)]">
           U
         </span>
         <span className="text-sm font-semibold text-sidebar-foreground">HRMS Payroll</span>
@@ -74,13 +75,13 @@ function SidebarBody({ user, currentCompany }: Omit<Props, "children">) {
 export function AppShell({ user, currentCompany, children }: Props) {
   return (
     <div className="flex min-h-svh w-full">
-      <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar md:block">
+      <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar bg-[radial-gradient(40rem_24rem_at_0%_0%,oklch(0.36_0.09_262/0.55),transparent_70%)] md:block">
         <div className="sticky top-0 h-svh">
           <SidebarBody user={user} currentCompany={currentCompany} />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 items-center gap-2 border-b bg-card px-3 md:hidden">
+        <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b bg-card/80 px-3 backdrop-blur-md md:hidden">
           <Sheet>
             <SheetTrigger
               render={<Button variant="ghost" size="icon" aria-label="Open navigation" />}
@@ -99,7 +100,9 @@ export function AppShell({ user, currentCompany, children }: Props) {
           <span className="text-sm font-semibold">{currentCompany?.code ?? "HRMS Payroll"}</span>
         </header>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+          <div className="mx-auto w-full max-w-6xl">
+            <PageTransition>{children}</PageTransition>
+          </div>
         </main>
       </div>
     </div>

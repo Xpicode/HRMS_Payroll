@@ -156,3 +156,188 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Motion. Small, quick, and only where it explains something: content settling
+   into place, a card lifting when it is clickable, a value changing. Everything
+   here is off for people who asked their OS for reduced motion.
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-up: fade-up 0.45s var(--ease-out-soft) both;
+  --animate-fade-in: fade-in 0.3s ease-out both;
+  --animate-float: float 14s ease-in-out infinite alternate;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes float {
+    from {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+      transform: translate3d(6%, -8%, 0) scale(1.12);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+@layer components {
+  /* A page's content settling in; children marked .stagger-item arrive one after another. */
+  .page-enter {
+    animation: var(--animate-fade-up);
+  }
+  .stagger > * {
+    animation: var(--animate-fade-up);
+    animation-delay: calc(var(--stagger-step, 45ms) * var(--i, 0));
+  }
+  .stagger > *:nth-child(1) {
+    --i: 0;
+  }
+  .stagger > *:nth-child(2) {
+    --i: 1;
+  }
+  .stagger > *:nth-child(3) {
+    --i: 2;
+  }
+  .stagger > *:nth-child(4) {
+    --i: 3;
+  }
+  .stagger > *:nth-child(5) {
+    --i: 4;
+  }
+  .stagger > *:nth-child(6) {
+    --i: 5;
+  }
+  .stagger > *:nth-child(7) {
+    --i: 6;
+  }
+  .stagger > *:nth-child(8) {
+    --i: 7;
+  }
+  .stagger > *:nth-child(n + 9) {
+    --i: 8;
+  }
+
+  /* Clickable surfaces lift a little; static ones do not move. */
+  .surface-hover {
+    transition:
+      transform 0.25s var(--ease-out-soft),
+      box-shadow 0.25s var(--ease-out-soft),
+      border-color 0.25s;
+  }
+  .surface-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 2px oklch(0.2 0.02 260 / 0.04),
+      0 12px 28px -12px oklch(0.2 0.02 260 / 0.18);
+  }
+
+  /* Loading placeholders: a soft sweep rather than a blink. */
+  .shimmer {
+    background: linear-gradient(
+      100deg,
+      var(--muted) 30%,
+      color-mix(in oklch, var(--muted), white 45%) 50%,
+      var(--muted) 70%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  /* Sign-in backdrop: two slow, blurred lights over the ink-navy panel and a faint grid. */
+  .aurora {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .aurora::before,
+  .aurora::after {
+    content: "";
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(70px);
+    opacity: 0.55;
+    animation: var(--animate-float);
+  }
+  .aurora::before {
+    width: 46rem;
+    height: 46rem;
+    left: -14rem;
+    top: -18rem;
+    background: radial-gradient(closest-side, oklch(0.55 0.12 262), transparent 70%);
+  }
+  .aurora::after {
+    width: 34rem;
+    height: 34rem;
+    right: -10rem;
+    bottom: -14rem;
+    background: radial-gradient(closest-side, oklch(0.8 0.15 80 / 0.9), transparent 70%);
+    animation-duration: 18s;
+    animation-direction: alternate-reverse;
+  }
+  .grid-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 0.05) 1px, transparent 1px);
+    background-size: 2.5rem 2.5rem;
+    mask-image: radial-gradient(ellipse at 30% 30%, black 20%, transparent 75%);
+  }
+}
+
+@layer base {
+  /* Paper with a hint of light from the top-left, so cards read as surfaces. */
+  body {
+    background-image:
+      radial-gradient(60rem 40rem at 10% -10%, oklch(0.36 0.09 262 / 0.05), transparent 60%),
+      radial-gradient(40rem 30rem at 100% 0%, oklch(0.8 0.15 80 / 0.06), transparent 60%);
+    background-attachment: fixed;
+  }
+  .dark body {
+    background-image:
+      radial-gradient(60rem 40rem at 10% -10%, oklch(0.6 0.1 262 / 0.1), transparent 60%),
+      radial-gradient(40rem 30rem at 100% 0%, oklch(0.8 0.15 80 / 0.06), transparent 60%);
+  }
+  /* Thin, quiet scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

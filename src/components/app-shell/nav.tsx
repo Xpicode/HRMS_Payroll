@@ -54,12 +54,18 @@ export function NavSection({ title, items }: { title: string; items: NavItem[] }
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/85 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  active &&
-                    "bg-sidebar-accent font-medium text-sidebar-foreground shadow-[inset_2px_0_0_0_var(--sidebar-primary)]",
+                  "group/nav relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/85 transition-[background-color,color,transform] duration-200 hover:translate-x-0.5 hover:bg-sidebar-accent hover:text-sidebar-foreground active:translate-x-0",
+                  // the gold bar grows in from the middle when a section becomes current
+                  "before:absolute before:top-1/2 before:left-0 before:h-0 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-primary before:transition-[height] before:duration-300 before:ease-out",
+                  active && "bg-sidebar-accent font-medium text-sidebar-foreground before:h-4",
                 )}
               >
-                <Icon className="size-4 shrink-0 opacity-80" />
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0 opacity-80 transition-transform duration-200 group-hover/nav:scale-110",
+                    active && "text-sidebar-primary opacity-100",
+                  )}
+                />
                 {item.label}
               </Link>
             </li>

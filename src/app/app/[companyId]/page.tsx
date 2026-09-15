@@ -74,7 +74,7 @@ export default async function CompanyDashboard({
         }
       />
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="stagger mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Headcount"
           value={String(counts.ACTIVE + counts.ON_LEAVE)}
@@ -113,7 +113,7 @@ export default async function CompanyDashboard({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="stagger grid gap-4 [--stagger-step:35ms] md:grid-cols-3">
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Payslip header</CardTitle>
@@ -251,9 +251,20 @@ function Stat({
       {sub ? <p className="truncate text-xs text-muted-foreground">{sub}</p> : null}
     </>
   );
+  if (href) {
+    return (
+      <Card className="surface-hover py-4 has-[a:focus-visible]:ring-ring">
+        <CardContent>
+          <Link href={href} className="block outline-none">
+            {body}
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Card className="py-4">
-      <CardContent>{href ? <Link href={href}>{body}</Link> : body}</CardContent>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }
