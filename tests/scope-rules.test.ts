@@ -154,6 +154,7 @@ describe("TENANT_MODELS", () => {
       "Company",
       "CompanyPayrollPolicy",
       "DailyTimeRecord",
+      "EmailMessage",
       "Employee",
       "EmployeeDocument",
       "EmployeePaySetting",

@@ -107,6 +107,7 @@ export function computePayslip(input: EngineInput): PayslipComputation {
     pagibigEr: new Decimal(0),
   };
   const timing = policy.statutoryTiming;
+  const share = (monthly: Decimal) => periodShare(monthly, period, timing);
   const timingNote =
     period.frequency === "MONTHLY"
       ? ""
@@ -250,6 +251,13 @@ export function computePayslip(input: EngineInput): PayslipComputation {
       sssWispEr: employer.sssWispEr.toFixed(2),
       philhealthEr: employer.philhealthEr.toFixed(2),
       pagibigEr: employer.pagibigEr.toFixed(2),
+    },
+    employerPeriod: {
+      sssEr: share(employer.sssEr).toFixed(2),
+      sssEc: share(employer.sssEc).toFixed(2),
+      sssWispEr: share(employer.sssWispEr).toFixed(2),
+      philhealthEr: share(employer.philhealthEr).toFixed(2),
+      pagibigEr: share(employer.pagibigEr).toFixed(2),
     },
     loanPayments: loans.payments,
   };

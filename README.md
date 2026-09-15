@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 6** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing, leave with credits, 201 attachments, separation / final pay, company dashboard).
+Status: **Phase 7** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing, leave with credits, 201 attachments, separation / final pay, company dashboard, government reports, 13th month, year-end annualization, email outbox, backups).
 
 ## Run locally from a fresh clone
 
@@ -243,6 +243,45 @@ docker/                  dev image + entrypoint
   unpaid), leave cases in `tests/attendance-summary.test.ts`, `tests/leave-attachments-schema.test.ts` (type sniffing,
   schemas), and `tests/integration/leave.test.ts` (the acceptance: an approved LWOP request reduces the next run;
   credits, refusal, cancel, rollover, separation / final pay, scoped attachments).
+
+## Reports, 13th month, year-end and email (Phase 7)
+
+- **Government reports** (`Reports`, ADMIN / PAYROLL_OFFICER): month or whole-year filter over **approved**
+  periods only (draft / computed periods in the range are listed and excluded). SSS contribution list (R-3 style:
+  EE, ER, EC, of which WISP), PhilHealth RF-1 (monthly basic, EE, ER), Pag-IBIG MCRF (EE, ER), BIR 1601-C
+  (gross, statutory EE, other non-taxable, taxable, withheld; MWE marked), annual per-employee summary for 2316 and
+  the alphalist (adds 13th month within / above the ₱90,000 ceiling and the annual tax due). On screen with totals
+  and as CSV from `/api/reports/{companyId}/{report}?year=&month=` (session + `reports.view` + company scope).
+  Rows are sums of `PayslipLine` (employee shares, tax) and of the snapshot's per-period employer shares
+  (`employerPeriod`, timed like the employee share so a month sums to the monthly remittance; older snapshots fall
+  back to `periodShare`). `tests/integration/reports-yearend.test.ts` asserts every report total against a raw SQL
+  sum of the lines.
+- **13th month** (`Payroll → Create 13th-month period`): `PayPeriod.type = THIRTEENTH_MONTH`, one per company and
+  year, coverage Jan 1 – Dec 31, pay date defaults to 15 Dec. `computeThirteenthMonth` (pure engine) = Σ BASIC lines
+  of the year's **approved** regular periods ÷ 12 — pro-rated by construction for mid-year hires / separations and
+  net of unpaid absences — one non-taxable line, manual adjustments merged, no statutory or loans. The excess over
+  ₱90,000 is flagged and carried as taxable income into the annualization. Same compute / approve / release / lock,
+  slip codes, snapshot, PDFs, print and email as any period; it never advances the regular cutoff sequence.
+- **Year-end annualization** (`Payroll → Year-end`): per employee, annual taxable = Σ taxable income of the year's
+  regular payslips + 13th-month excess; annual tax due from the **ANNUAL** column of the withholding table
+  (`TaxBracket.frequency` is now `TaxTableFrequency`: SEMI_MONTHLY / MONTHLY / ANNUAL; TRAIN rates seeded); withheld
+  = Σ WTAX lines (earlier annualization lines are ignored). **Apply to last period** writes a `TAX_REFUND` earning
+  or `WTAX_ADJ` deduction adjustment into the last _unapproved_ regular period of the year and recomputes it;
+  re-applying replaces the line (idempotent), a zero difference removes it. Figures from unapproved periods are
+  marked provisional.
+- **Email outbox** (per company, off by default: Company settings → Email payslips): `EmailMessage` rows, one per
+  payslip of an approved period with final PDFs. `Email payslips` (approver roles) queues `SEND_PAYSLIP_EMAIL`;
+  the job sends each employee their own PDF (nodemailer) and records SENT / FAILED (error kept) / SKIPPED (no email
+  on file) per employee, shown on the period page; a second run reaches only the unsent. SMTP comes from `.env`:
+  `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`. `SMTP_HOST=json` is a log-only
+  transport (nothing leaves the machine) for development and tests; empty = feature unavailable.
+- **Backups** (`pnpm backup` → `scripts/backup.sh`): `pg_dump` (gzip) + a tarball of `/data` into `BACKUP_DIR`
+  (default `./backups`, git-ignored), rotating files older than `BACKUP_KEEP_DAYS` (14). Detects the compose stack:
+  dumps through the `db` container when it is up, otherwise `pg_dump` on PATH against `DATABASE_URL`; tars the `app`
+  container's `/data` when it is up, otherwise `DATA_DIR`. Partial files are removed on failure and a dump under 1 KB
+  fails the run. Restore commands are in the script header. Schedule it with cron / Task Scheduler on the host.
+- **Seed additions**: ANNUAL tax brackets (added to an existing table on re-seed), pay components
+  `THIRTEENTH_MONTH`, `TAX_REFUND`, `WTAX_ADJ`.
 
 ## Conventions worth knowing
 

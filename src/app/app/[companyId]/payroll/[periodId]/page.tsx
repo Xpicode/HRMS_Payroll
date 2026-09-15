@@ -10,13 +10,16 @@ import { formatMoney } from "@/lib/money";
 import { canApprove, getPeriod, listPayslips } from "@/modules/payroll/service";
 import { periodPdfStatus } from "@/modules/documents/service";
 import { PdfPanel } from "@/modules/documents/components/pdf-panel";
+import { periodOutbox } from "@/modules/email/service";
+import { EmailPanel } from "@/modules/email/components/email-panel";
+import { formatDateTime } from "@/lib/dates";
 import { isFrozen } from "@/modules/payroll/schema";
 import {
   LifecycleButton,
   PayDateForm,
   RevertForm,
 } from "@/modules/payroll/components/period-forms";
-import { PeriodStatusBadge } from "@/modules/payroll/components/status-badge";
+import { PeriodStatusBadge, PeriodTypeBadge } from "@/modules/payroll/components/status-badge";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,7 +48,9 @@ type Search = Partial<
     | "locked"
     | "reverted"
     | "saved"
-    | "pdfs",
+    | "pdfs"
+    | "emails"
+    | "skipped",
     string
   >
 >;
@@ -70,10 +75,11 @@ export default async function PayPeriodPage({
   const scope = await getScope();
   const period = await getPeriod(scope, companyId, periodId);
   if (!period) notFound();
-  const [payslips, approver, pdfs] = await Promise.all([
+  const [payslips, approver, pdfs, outbox] = await Promise.all([
     listPayslips(scope, companyId, periodId),
     canApprove(scope, companyId, toIsoDate(period.coverageEnd)),
     periodPdfStatus(scope, companyId, periodId),
+    periodOutbox(scope, companyId, periodId),
   ]);
   const canCompute = roleCan(user.role, "payroll.compute");
   const canRevert = roleCan(user.role, "payroll.revert");
@@ -111,16 +117,23 @@ export default async function PayPeriodPage({
                 ? "Pay date saved."
                 : sp.pdfs
                   ? "PDF generation queued."
-                  : null;
+                  : sp.emails !== undefined
+                    ? `Queued ${sp.emails} email(s)${Number(sp.skipped) ? `, ${sp.skipped} skipped (no email on file)` : ""}.`
+                    : null;
 
   return (
     <>
       <PageHeader
         eyebrow={`${company.code} · Payroll`}
-        title={formatCutoff(cutoff)}
+        title={
+          period.type === "THIRTEENTH_MONTH"
+            ? `13th month ${period.coverageStart.getUTCFullYear()}`
+            : formatCutoff(cutoff)
+        }
         description={`Pay date ${formatDateOnly(period.payDate)} · ${payslips.length} payslip(s)${period.approvedBy ? ` · approved by ${period.approvedBy.name}` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <PeriodTypeBadge type={period.type} />
             <PeriodStatusBadge status={period.status} className="text-sm" />
             <Button variant="ghost" size="sm" render={<Link href={base} />} nativeButton={false}>
               <ArrowLeftIcon data-icon="inline-start" />
@@ -196,6 +209,30 @@ export default async function PayPeriodPage({
           hasPayslips={payslips.length > 0}
         />
       </div>
+
+      {frozen ? (
+        <EmailPanel
+          companyId={companyId}
+          periodId={periodId}
+          enabled={outbox.enabled}
+          configured={outbox.configured}
+          mode={outbox.mode}
+          canSend={approver}
+          finalReady={pdfs.finalReady}
+          jobActive={outbox.job?.status === "QUEUED" || outbox.job?.status === "RUNNING"}
+          counts={outbox.counts}
+          messages={outbox.messages.map((m) => ({
+            id: m.id,
+            to: m.toAddress,
+            status: m.status,
+            error: m.error,
+            sentAt: m.sentAt ? formatDateTime(m.sentAt) : null,
+            attempts: m.attempts,
+            employee: `${m.payslip.employee.lastName}, ${m.payslip.employee.firstName}`,
+            slipCode: m.payslip.slipCode,
+          }))}
+        />
+      ) : null}
 
       {frozen ? (
         <Alert className="mb-4">

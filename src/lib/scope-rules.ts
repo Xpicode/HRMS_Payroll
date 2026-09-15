@@ -38,6 +38,7 @@ export const TENANT_MODELS: Readonly<Record<string, TenantMode>> = {
   LeaveBalance: "strict",
   LeaveRequest: "strict",
   EmployeeDocument: "strict",
+  EmailMessage: "strict",
 };
 
 export const REFUSED_OPERATIONS: ReadonlySet<string> = new Set([

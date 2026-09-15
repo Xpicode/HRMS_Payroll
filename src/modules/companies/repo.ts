@@ -88,7 +88,11 @@ export function createCompany(scope: Scope, data: CompanyData, policy: PolicyDat
   });
 }
 
-export function updateCompany(scope: Scope, id: string, data: CompanyData & { isActive: boolean }) {
+export function updateCompany(
+  scope: Scope,
+  id: string,
+  data: CompanyData & { isActive: boolean; emailPayslipsEnabled: boolean },
+) {
   return scoped(scope).company.update({ where: { id }, data });
 }
 

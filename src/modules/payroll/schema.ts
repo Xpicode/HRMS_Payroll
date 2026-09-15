@@ -14,6 +14,13 @@ export const createPeriodSchema = z.object({
 });
 export type CreatePeriodInput = z.infer<typeof createPeriodSchema>;
 
+/** 13th-month period: one per calendar year (Phase 7). */
+export const createThirteenthSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  payDate: z.preprocess(blankToNull, z.string().refine(isIsoDate, "Invalid date").nullable()),
+});
+export type CreateThirteenthInput = z.infer<typeof createThirteenthSchema>;
+
 export const payDateSchema = z.object({
   payDate: z.string().refine(isIsoDate, "Invalid date"),
 });
@@ -41,6 +48,9 @@ export const PERIOD_STATUS_LABELS: Record<PayPeriodStatus, string> = {
   RELEASED: "Released",
   LOCKED: "Locked",
 };
+
+/** Component codes written by the year-end annualization (Phase 7); replaced on re-apply. */
+export const ANNUALIZATION_CODES = ["TAX_REFUND", "WTAX_ADJ"] as const;
 
 export const STATUS_ORDER: Record<PayPeriodStatus, number> = {
   DRAFT: 0,

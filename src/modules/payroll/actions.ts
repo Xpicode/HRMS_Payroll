@@ -13,7 +13,12 @@ import {
   invalid,
   type ActionResult,
 } from "@/lib/action-result";
-import { adjustmentSchema, createPeriodSchema, payDateSchema } from "./schema";
+import {
+  adjustmentSchema,
+  createPeriodSchema,
+  createThirteenthSchema,
+  payDateSchema,
+} from "./schema";
 import * as service from "./service";
 import { enqueuePeriodPdfs, runDueJobs } from "@/modules/documents/service";
 
@@ -46,6 +51,25 @@ export async function createPeriodAction(
   try {
     const scope = await getScope();
     periodId = (await service.createPeriod(scope, companyId, input)).id;
+  } catch (e) {
+    return handleError(e, formData);
+  }
+  revalidatePath(`/app/${companyId}/payroll`);
+  redirect(`${periodPath(companyId, periodId)}?created=1`);
+}
+
+export async function createThirteenthMonthAction(
+  companyId: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!isUuid(companyId)) return fail("Invalid company.");
+  const parsed = createThirteenthSchema.safeParse(formToObject(formData));
+  if (!parsed.success) return withValues(invalid(parsed.error), formData);
+  let periodId: string;
+  try {
+    const scope = await getScope();
+    periodId = (await service.createThirteenthMonthPeriod(scope, companyId, parsed.data)).id;
   } catch (e) {
     return handleError(e, formData);
   }

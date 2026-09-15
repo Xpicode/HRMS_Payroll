@@ -60,7 +60,11 @@ export const companySchema = z.object({
 });
 export type CompanyInput = z.infer<typeof companySchema>;
 
-export const updateCompanySchema = companySchema.extend({ isActive: checkbox });
+export const updateCompanySchema = companySchema.extend({
+  isActive: checkbox,
+  /** Phase 7: offer "Email payslips" on approved periods. */
+  emailPayslipsEnabled: checkbox,
+});
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 
 const isoDate = z.string().refine(isIsoDate, "Enter a date (YYYY-MM-DD)");

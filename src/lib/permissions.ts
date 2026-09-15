@@ -32,6 +32,8 @@ export const PERMISSIONS = {
   "leave.approve": ["ADMIN", "PAYROLL_OFFICER"],
   "leave.manage_types": ["ADMIN", "PAYROLL_OFFICER"],
   "leave.adjust_credits": ["ADMIN", "PAYROLL_OFFICER"],
+  /** Government reports and year-end (Phase 7). */
+  "reports.view": ["ADMIN", "PAYROLL_OFFICER"],
   /** 201 attachments (Phase 6). */
   "documents.view": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],
   "documents.manage": ["ADMIN", "PAYROLL_OFFICER", "ENCODER"],

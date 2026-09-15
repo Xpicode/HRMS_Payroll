@@ -25,6 +25,9 @@ function buildNav(user: CurrentUser, company: CompanySummary | null) {
         ...(roleCan(user.role, "payroll.compute")
           ? [{ href: `/app/${company.id}/payroll`, label: "Payroll", icon: "payroll" as const }]
           : []),
+        ...(roleCan(user.role, "reports.view")
+          ? [{ href: `/app/${company.id}/reports`, label: "Reports", icon: "reports" as const }]
+          : []),
         ...(roleCan(user.role, "companies.update")
           ? [
               {

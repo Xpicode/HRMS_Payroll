@@ -26,7 +26,8 @@
     "db:seed": "tsx prisma/seed/index.ts",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "backup": "bash scripts/backup.sh"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
@@ -43,6 +44,7 @@
     "next": "16.3.5",
     "next-auth": "5.0.0-beta.32",
     "next-themes": "^0.4.6",
+    "nodemailer": "^10.0.9",
     "pg": "^8.23.0",
     "playwright": "1.63.0",
     "react": "19.3.0",
@@ -57,6 +59,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",

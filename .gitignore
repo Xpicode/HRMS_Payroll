@@ -51,3 +51,6 @@ next-env.d.ts
 
 # pnpm store created by the dev container if the volume is missing
 /.pnpm-store/
+
+# local backups (scripts/backup.sh)
+/backups

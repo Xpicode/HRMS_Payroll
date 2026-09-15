@@ -13,6 +13,7 @@ import { formatCutoff, type Cutoff, type CutoffFrequency } from "@/lib/dates";
 import {
   addAdjustmentAction,
   createPeriodAction,
+  createThirteenthMonthAction,
   periodLifecycleAction,
   revertPeriodAction,
   updatePayDateAction,
@@ -76,6 +77,51 @@ export function CreatePeriodForms({
         </SubmitButton>
       </form>
     </div>
+  );
+}
+
+export function CreateThirteenthForm({
+  companyId,
+  defaultYear,
+}: {
+  companyId: string;
+  defaultYear: number;
+}) {
+  const [state, formAction] = useActionState(
+    createThirteenthMonthAction.bind(null, companyId),
+    initialActionState,
+  );
+  const errors = !state.ok ? state.fieldErrors : undefined;
+  const v = (!state.ok && state.values) || {};
+  return (
+    <form action={formAction} className="space-y-3" noValidate>
+      <FormAlert state={state} />
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Year" name="year" error={errors?.year}>
+          <Input
+            id="year"
+            name="year"
+            type="number"
+            min={2000}
+            max={2100}
+            defaultValue={v.year ?? String(defaultYear)}
+            className="w-28 tabular"
+          />
+        </Field>
+        <Field label="Pay date" name="payDate" error={errors?.payDate} hint="Blank = 15 Dec">
+          <Input
+            id="payDate"
+            name="payDate"
+            type="date"
+            defaultValue={v.payDate ?? ""}
+            className="w-44"
+          />
+        </Field>
+        <SubmitButton variant="outline" pendingText="Creating…">
+          Create 13th-month period
+        </SubmitButton>
+      </div>
+    </form>
   );
 }
 

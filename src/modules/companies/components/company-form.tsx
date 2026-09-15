@@ -44,6 +44,7 @@ export type CompanyFormValues = {
   paperSize: "LETTER" | "A4";
   paperOrientation: "LANDSCAPE" | "PORTRAIT";
   isActive: boolean;
+  emailPayslipsEnabled: boolean;
 };
 
 type Props = { mode: "create"; company?: undefined } | { mode: "edit"; company: CompanyFormValues };
@@ -357,6 +358,14 @@ export function CompanyForm(props: Props) {
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox name="isActive" defaultChecked={props.company.isActive} />
                 Active — appears in the company switcher
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  name="emailPayslipsEnabled"
+                  defaultChecked={props.company.emailPayslipsEnabled}
+                />
+                Email payslips — offer &quot;Email payslips&quot; on approved periods (needs SMTP in
+                .env)
               </label>
             </>
           ) : null}

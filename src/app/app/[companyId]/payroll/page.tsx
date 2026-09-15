@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalculatorIcon } from "lucide-react";
+import { CalculatorIcon, CalendarCheckIcon, FileSpreadsheetIcon } from "lucide-react";
 import { getScope, requireCompany } from "@/lib/session";
 import { roleCan } from "@/lib/permissions";
-import { formatCutoff, formatDateOnly, toIsoDate } from "@/lib/dates";
+import { formatCutoff, formatDateOnly, todayInManila, toIsoDate } from "@/lib/dates";
 import { getPayFrequency } from "@/modules/attendance/service";
 import { listPeriods, nextPeriodCutoff } from "@/modules/payroll/service";
-import { CreatePeriodForms } from "@/modules/payroll/components/period-forms";
-import { PeriodStatusBadge } from "@/modules/payroll/components/status-badge";
+import { CreatePeriodForms, CreateThirteenthForm } from "@/modules/payroll/components/period-forms";
+import { PeriodStatusBadge, PeriodTypeBadge } from "@/modules/payroll/components/status-badge";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,14 +51,34 @@ export default async function PayrollPage({
         title="Payroll"
         description="Pay periods: compute payslips from attendance, review, approve (freeze), release and lock."
         actions={
-          <Button
-            variant="outline"
-            render={<Link href={`${base}/calculator`} />}
-            nativeButton={false}
-          >
-            <CalculatorIcon data-icon="inline-start" />
-            Calculator
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              render={<Link href={`/app/${companyId}/reports`} />}
+              nativeButton={false}
+            >
+              <FileSpreadsheetIcon data-icon="inline-start" />
+              Reports
+            </Button>
+            {canCompute ? (
+              <Button
+                variant="outline"
+                render={<Link href={`${base}/year-end`} />}
+                nativeButton={false}
+              >
+                <CalendarCheckIcon data-icon="inline-start" />
+                Year-end
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              render={<Link href={`${base}/calculator`} />}
+              nativeButton={false}
+            >
+              <CalculatorIcon data-icon="inline-start" />
+              Calculator
+            </Button>
+          </div>
         }
       />
       {sp.deleted ? (
@@ -76,8 +96,18 @@ export default async function PayrollPage({
               produce payslips.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <CreatePeriodForms companyId={companyId} nextCutoff={next} frequency={frequency} />
+            <div className="border-t pt-4">
+              <p className="mb-2 text-sm text-muted-foreground">
+                13th-month pay: Σ basic of the year&apos;s approved periods ÷ 12, one period per
+                year, same approve / print / email flow.
+              </p>
+              <CreateThirteenthForm
+                companyId={companyId}
+                defaultYear={Number(todayInManila().slice(0, 4))}
+              />
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -108,12 +138,15 @@ export default async function PayrollPage({
                   <TableRow key={p.id}>
                     <TableCell>
                       <Link href={`${base}/${p.id}`} className="font-medium hover:underline">
-                        {formatCutoff({
-                          start: toIsoDate(p.coverageStart),
-                          end: toIsoDate(p.coverageEnd),
-                          sequenceInMonth: p.sequenceInMonth === 2 ? 2 : 1,
-                        })}
+                        {p.type === "THIRTEENTH_MONTH"
+                          ? `13th month ${p.coverageStart.getUTCFullYear()}`
+                          : formatCutoff({
+                              start: toIsoDate(p.coverageStart),
+                              end: toIsoDate(p.coverageEnd),
+                              sequenceInMonth: p.sequenceInMonth === 2 ? 2 : 1,
+                            })}
                       </Link>
+                      <PeriodTypeBadge type={p.type} />
                     </TableCell>
                     <TableCell className="tabular">{formatDateOnly(p.payDate)}</TableCell>
                     <TableCell>

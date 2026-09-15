@@ -23,6 +23,14 @@ const schema = z.object({
   JOBS_TOKEN: z.string().min(24, "JOBS_TOKEN must be at least 24 characters"),
   /** Where Chromium is launched from for PDF rendering (Playwright default when unset). */
   PLAYWRIGHT_CHROMIUM_PATH: z.string().optional(),
+  /** Email outbox (Phase 7). Unset SMTP_HOST = off; "json" = log-only transport for dev/tests. */
+  SMTP_HOST: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_SECURE: z.preprocess((v) => v === "true" || v === "1", z.boolean()).default(false),
+  SMTP_USER: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),
+  SMTP_PASS: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),
+  /** From header, e.g. "Payroll <payroll@example.com>". */
+  SMTP_FROM: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),
 });
 
 export type Env = z.infer<typeof schema>;

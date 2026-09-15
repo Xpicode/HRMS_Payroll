@@ -1,5 +1,5 @@
 import { Decimal, money, round2 } from "@/lib/money";
-import type { EngineFrequency, TaxBracketInput } from "./types";
+import type { TaxBracketInput, TaxTableFrequency } from "./types";
 
 export type TaxComputation = { tax: Decimal; bracket: TaxBracketInput | null; exempt: boolean };
 
@@ -11,7 +11,7 @@ export type TaxComputation = { tax: Decimal; bracket: TaxBracketInput | null; ex
  */
 export function computeWithholdingTax(
   taxableIncome: Decimal,
-  frequency: EngineFrequency,
+  frequency: TaxTableFrequency,
   brackets: TaxBracketInput[],
   isMinimumWage: boolean,
 ): TaxComputation {

@@ -71,6 +71,7 @@ export default async function CompanySettingsPage({
               paperSize: company.paperSize,
               paperOrientation: company.paperOrientation,
               isActive: company.isActive,
+              emailPayslipsEnabled: company.emailPayslipsEnabled,
             }}
           />
           <Card className="h-fit">

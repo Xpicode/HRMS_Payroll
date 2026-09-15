@@ -1,6 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
-import type { PayComponentKind, PayPeriodStatus } from "@/generated/prisma/enums";
+import type { PayComponentKind, PayPeriodStatus, PayPeriodType } from "@/generated/prisma/enums";
 import { audit } from "@/lib/audit";
 import { AppError } from "@/lib/action-result";
 import {
@@ -24,9 +24,17 @@ import {
   type PostedPayment,
 } from "@/modules/loans/service";
 import * as repo from "./repo";
-import { isFrozen, type AdjustmentFormInput, type CreatePeriodInput } from "./schema";
+import {
+  ANNUALIZATION_CODES,
+  isFrozen,
+  type AdjustmentFormInput,
+  type CreatePeriodInput,
+  type CreateThirteenthInput,
+} from "./schema";
 import {
   computePayslip,
+  computeThirteenthMonth,
+  THIRTEENTH_MONTH_NON_TAXABLE_CEILING,
   type AdjustmentInput,
   type EngineInput,
   type EnginePaySetting,
@@ -319,6 +327,22 @@ export async function listPeriods(scope: Scope, companyId: string) {
   return repo.listPeriods(scope, companyId);
 }
 
+/** Periods of any type whose coverage ends in a range (reports, year-end). */
+export async function listPeriodsEndingBetween(
+  scope: Scope,
+  companyId: string,
+  start: string,
+  end: string,
+  type?: PayPeriodType,
+) {
+  assertPermission(scope, "payroll.view");
+  assertCompanyAccess(scope, companyId);
+  return repo.listPeriodsEndingBetween(repo.root(scope), companyId, start, end, type);
+}
+
+/** Re-exported so other modules can ask "is this status frozen?" through the service. */
+export const isFrozenStatus = isFrozen;
+
 /** The most recent period (by coverage start), for the dashboard. */
 export async function latestPeriod(scope: Scope, companyId: string) {
   assertCompanyAccess(scope, companyId);
@@ -400,6 +424,76 @@ export async function createPeriod(
   });
 }
 
+/**
+ * 13th-month period for a calendar year (Phase 7): coverage Jan 1 – Dec 31, one per company
+ * and year, same lifecycle as a regular period. Pay date defaults to Dec 15.
+ */
+export async function createThirteenthMonthPeriod(
+  scope: Scope,
+  companyId: string,
+  input: CreateThirteenthInput,
+) {
+  assertPermission(scope, "payroll.compute");
+  assertCompanyAccess(scope, companyId);
+  const company = await getCompany(scope, companyId);
+  if (!company) throw new AppError("Company not found.");
+  const start = `${input.year}-01-01`;
+  const end = `${input.year}-12-31`;
+  const payDate = input.payDate ?? `${input.year}-12-15`;
+  if (payDate < start || payDate > `${input.year + 1}-01-31`)
+    throw new AppError("Pay date must fall in the year (or January of the next).", {
+      payDate: ["Outside the year"],
+    });
+  return repo.transaction(scope, async (tx) => {
+    if (await repo.findPeriodByStart(tx, companyId, start, "THIRTEENTH_MONTH"))
+      throw new AppError(`A 13th-month period for ${input.year} already exists.`);
+    const period = await repo.createPeriod(tx, companyId, {
+      type: "THIRTEENTH_MONTH",
+      coverageStart: start,
+      coverageEnd: end,
+      payDate,
+      frequency: company.payFrequency,
+      sequenceInMonth: 1,
+    });
+    await audit("PayPeriod", period.id, "CREATE", null, period, { scope, companyId, tx });
+    return period;
+  });
+}
+
+/**
+ * The 13th-month basis: per employee, Σ BASIC lines of the year's approved regular periods.
+ * Read from payslip lines (never recomputed from attendance), so it matches what was paid.
+ */
+export async function thirteenthMonthBasis(scope: Scope, companyId: string, year: number) {
+  assertPermission(scope, "payroll.view");
+  assertCompanyAccess(scope, companyId);
+  const db = repo.root(scope);
+  const periods = (
+    await repo.listPeriodsEndingBetween(db, companyId, `${year}-01-01`, `${year}-12-31`, "REGULAR")
+  ).filter((p) => isFrozen(p.status));
+  const sums = await repo.sumLinesByEmployee(
+    db,
+    companyId,
+    periods.map((p) => p.id),
+    "BASIC",
+  );
+  const byPeriod = new Map(periods.map((p) => [p.id, p]));
+  const out = new Map<string, { periodId: string; start: string; end: string; amount: string }[]>();
+  for (const s of sums) {
+    const p = byPeriod.get(s.payPeriodId)!;
+    const list = out.get(s.employeeId) ?? [];
+    list.push({
+      periodId: p.id,
+      start: toIsoDate(p.coverageStart),
+      end: toIsoDate(p.coverageEnd),
+      amount: s.amount,
+    });
+    out.set(s.employeeId, list);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.start.localeCompare(b.start));
+  return { periods, basis: out };
+}
+
 export async function updatePayDate(
   scope: Scope,
   companyId: string,
@@ -448,6 +542,12 @@ export type StoredComputation = {
     statutory: StatutoryEffective;
   };
   output: PayslipComputation;
+  /** Present on 13th-month payslips: the basis behind the single line. */
+  thirteenthMonth?: {
+    year: number;
+    totalBasic: string;
+    periods: { periodId: string; start: string; end: string; amount: string }[];
+  };
 };
 
 type EmployeeForPayroll = Awaited<ReturnType<typeof listEmployeesForPayroll>>[number];
@@ -556,6 +656,8 @@ export async function computePeriod(
   if (!period) throw new AppError("Pay period not found.");
   if (isFrozen(period.status))
     throw new AppError("This period is approved. Revert it (admin) before recomputing.");
+  if (period.type === "THIRTEENTH_MONTH")
+    return computeThirteenthPeriod(scope, companyId, period, onlyEmployeeId);
   const cutoff = cutoffOfPeriod(period);
   const [ctx, employees] = await Promise.all([
     loadRunContext(scope, companyId, cutoff),
@@ -611,6 +713,174 @@ export async function computePeriod(
     );
     return { computed, skipped, flagged };
   });
+}
+
+/**
+ * 13th-month run: one payslip per employee with approved basic pay in the year. The stored
+ * computation keeps the same shape as a regular one (zero attendance summary) plus the basis,
+ * so approval, snapshots, PDFs and reports need no special case.
+ */
+async function computeThirteenthPeriod(
+  scope: Scope,
+  companyId: string,
+  period: NonNullable<Awaited<ReturnType<typeof repo.getPeriod>>>,
+  onlyEmployeeId?: string,
+) {
+  const year = period.coverageStart.getUTCFullYear();
+  const cutoff = cutoffOfPeriod(period);
+  const [company, policy, { effective }, components, { basis }, employees] = await Promise.all([
+    getCompany(scope, companyId),
+    getPolicyOn(scope, companyId, cutoff.end),
+    loadStatutoryTables(scope, cutoff.end),
+    listPayComponents(scope),
+    thirteenthMonthBasis(scope, companyId, year),
+    listEmployeesForPayroll(scope, companyId, cutoff.start, cutoff.end),
+  ]);
+  if (!company) throw new AppError("Company not found.");
+  if (!policy) throw new AppError("No payroll policy is in force. Set one in Company settings.");
+  const enginePolicy = toEnginePolicy(policy);
+  const periodInput: EngineInput["period"] = {
+    start: cutoff.start,
+    end: cutoff.end,
+    frequency: company.payFrequency,
+    sequenceInMonth: 1,
+  };
+  const zeroByType = { REGULAR: 0, REST_DAY: 0, SPECIAL: 0, REGULAR_HOLIDAY: 0 };
+  const targets = employees.filter(
+    (e) => basis.has(e.id) && (!onlyEmployeeId || e.id === onlyEmployeeId),
+  );
+  if (onlyEmployeeId && targets.length === 0)
+    throw new AppError("Employee has no approved basic pay this year.");
+  return repo.transaction(scope, async (tx) => {
+    const adjustments = await adjustmentsByEmployee(tx, companyId, period.id);
+    let computed = 0;
+    let flagged = 0;
+    for (const e of targets) {
+      const setting = paySettingOn(e.paySettings, cutoff.end);
+      if (!setting) continue;
+      const paySetting = toEnginePaySetting(setting);
+      const basics = basis.get(e.id) ?? [];
+      const output = computeThirteenthMonth({
+        year,
+        basics,
+        paySetting,
+        policy: enginePolicy,
+        components,
+        adjustments: adjustments.get(e.id) ?? [],
+        nonTaxableCeiling: THIRTEENTH_MONTH_NON_TAXABLE_CEILING,
+      });
+      const c: StoredComputation = {
+        input: {
+          paySetting,
+          policy: enginePolicy,
+          statutory: effective,
+          summary: {
+            employeeId: e.id,
+            employeeNo: e.employeeNo,
+            coverageStart: cutoff.start,
+            coverageEnd: cutoff.end,
+            calendarDays: 0,
+            scheduledDays: 0,
+            daysWorked: 0,
+            daysWorkedByType: { ...zeroByType },
+            hoursWorkedByType: { ...zeroByType },
+            absentDays: 0,
+            unrecordedDays: 0,
+            lateMinutes: 0,
+            undertimeMinutes: 0,
+            otHoursByType: { ...zeroByType },
+            otHours: 0,
+            nightDiffHours: 0,
+            regularHolidaysNotWorked: 0,
+            regularHolidaysWorked: 0,
+            leaveWithPayDays: 0,
+            leaveWithoutPayDays: 0,
+          },
+          period: periodInput,
+          recurring: [],
+          adjustments: adjustments.get(e.id) ?? [],
+          loans: [],
+        },
+        output,
+        thirteenthMonth: {
+          year,
+          totalBasic: basics.reduce((t, b) => t + Number(b.amount), 0).toFixed(2),
+          periods: basics,
+        },
+      };
+      const { row, lines } = payslipRows(c, false);
+      await repo.upsertPayslip(tx, companyId, period.id, e.id, row, lines);
+      computed++;
+      if (output.flags.length) flagged++;
+    }
+    if (!onlyEmployeeId)
+      await repo.deletePayslipsExcept(
+        tx,
+        companyId,
+        period.id,
+        targets.map((e) => e.id),
+      );
+    const after = await repo.updatePeriod(tx, companyId, period.id, {
+      status: "COMPUTED",
+      computedAt: new Date(),
+    });
+    await audit(
+      "PayPeriod",
+      period.id,
+      "UPDATE",
+      { status: period.status },
+      { status: after.status, computed, skipped: 0, flagged, type: "THIRTEENTH_MONTH" },
+      { scope, companyId, tx },
+    );
+    return { computed, skipped: employees.length - targets.length, flagged };
+  });
+}
+
+/**
+ * Year-end annualization write (Phase 7): replace one employee's annualization lines in a
+ * period with a refund (earning) or additional tax (deduction), then recompute them.
+ * `line` null removes any existing annualization adjustment.
+ */
+export async function setAnnualizationAdjustment(
+  scope: Scope,
+  companyId: string,
+  periodId: string,
+  employeeId: string,
+  line: { kind: "REFUND" | "ADDITIONAL"; amount: string; reason: string } | null,
+) {
+  assertPermission(scope, "payroll.compute");
+  assertCompanyAccess(scope, companyId);
+  await repo.transaction(scope, async (tx) => {
+    const removed = await repo.deleteAdjustmentsByCode(
+      tx,
+      companyId,
+      periodId,
+      employeeId,
+      ANNUALIZATION_CODES,
+    );
+    let created: unknown = null;
+    if (line) {
+      created = await repo.createAdjustment(tx, companyId, {
+        payPeriodId: periodId,
+        employeeId,
+        componentCode: line.kind === "REFUND" ? "TAX_REFUND" : "WTAX_ADJ",
+        kind: line.kind === "REFUND" ? "EARNING" : "DEDUCTION",
+        label: line.kind === "REFUND" ? "Tax refund (annualized)" : "Tax due (annualized)",
+        amount: line.amount,
+        reason: line.reason,
+        createdById: scope.userId,
+      });
+    }
+    await audit(
+      "PayrollAdjustment",
+      `${periodId}:${employeeId}:annualization`,
+      line ? "UPDATE" : "DELETE",
+      { removed },
+      created,
+      { scope, companyId, tx },
+    );
+  });
+  await computePeriod(scope, companyId, periodId, employeeId);
 }
 
 // ---------------------------------------------------------------------------
@@ -775,7 +1045,7 @@ export type PayslipSnapshot = {
     tin: string | null;
     taxStatus: string;
   };
-  period: EngineInput["period"] & { payDate: string; id: string };
+  period: EngineInput["period"] & { payDate: string; id: string; type?: PayPeriodType };
   computation: StoredComputation;
   loanPayments: PostedPayment[];
   /** Last payslip of a separated employee (Phase 6; absent on older snapshots). */
@@ -864,7 +1134,12 @@ export async function approvePeriod(scope: Scope, companyId: string, periodId: s
           tin: e.tin,
           taxStatus: e.taxStatus,
         },
-        period: { ...computation.input.period, payDate: toIsoDate(period.payDate), id: periodId },
+        period: {
+          ...computation.input.period,
+          payDate: toIsoDate(period.payDate),
+          id: periodId,
+          type: period.type,
+        },
         computation,
         loanPayments,
         finalPay: slip.finalPay,

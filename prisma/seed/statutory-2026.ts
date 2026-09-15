@@ -86,7 +86,7 @@ export const PAGIBIG_2026 = {
 // semi-monthly and monthly columns. tax = baseTax + (taxable − lower) × rateOver.
 // ---------------------------------------------------------------------------
 export type TaxSeedRow = {
-  frequency: "SEMI_MONTHLY" | "MONTHLY";
+  frequency: "SEMI_MONTHLY" | "MONTHLY" | "ANNUAL";
   lower: string;
   upper: string | null;
   baseTax: string;
@@ -150,6 +150,37 @@ export const TAX_BRACKETS_2023: TaxSeedRow[] = [
     rateOver: "0.3000",
   },
   { frequency: "MONTHLY", lower: m(666667), upper: null, baseTax: m(183541.8), rateOver: "0.3500" },
+  // Annual (year-end annualization, TRAIN law rates from 1 Jan 2023: RA 10963 Sec. 24(A)(2))
+  { frequency: "ANNUAL", lower: m(0), upper: m(250000), baseTax: m(0), rateOver: "0.0000" },
+  { frequency: "ANNUAL", lower: m(250000), upper: m(400000), baseTax: m(0), rateOver: "0.1500" },
+  {
+    frequency: "ANNUAL",
+    lower: m(400000),
+    upper: m(800000),
+    baseTax: m(22500),
+    rateOver: "0.2000",
+  },
+  {
+    frequency: "ANNUAL",
+    lower: m(800000),
+    upper: m(2000000),
+    baseTax: m(102500),
+    rateOver: "0.2500",
+  },
+  {
+    frequency: "ANNUAL",
+    lower: m(2000000),
+    upper: m(8000000),
+    baseTax: m(402500),
+    rateOver: "0.3000",
+  },
+  {
+    frequency: "ANNUAL",
+    lower: m(8000000),
+    upper: null,
+    baseTax: m(2202500),
+    rateOver: "0.3500",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -274,6 +305,31 @@ export const PAY_COMPONENTS: PayComponentSeed[] = [
     isSystem: true,
   },
   { code: "OTHERS", name: "Others", kind: "DEDUCTION", taxable: false, order: 200, isSystem: true },
+  // Phase 7
+  {
+    code: "THIRTEENTH_MONTH",
+    name: "13th month pay",
+    kind: "EARNING",
+    taxable: false,
+    order: 70,
+    isSystem: true,
+  },
+  {
+    code: "TAX_REFUND",
+    name: "Tax refund (annualized)",
+    kind: "EARNING",
+    taxable: false,
+    order: 80,
+    isSystem: true,
+  },
+  {
+    code: "WTAX_ADJ",
+    name: "Tax due (annualized)",
+    kind: "DEDUCTION",
+    taxable: false,
+    order: 155,
+    isSystem: true,
+  },
 ];
 
 /** Idempotent: rows for an effective date are only inserted when none exist yet. */
@@ -302,6 +358,16 @@ export async function seedStatutory(prisma: PrismaClient) {
     console.log(
       `BIR withholding table ${TAX_TABLE_EFFECTIVE_FROM}: ${TAX_BRACKETS_2023.length} rows.`,
     );
+  } else if (
+    (await prisma.taxBracket.count({ where: { effectiveFrom: taxFrom, frequency: "ANNUAL" } })) ===
+    0
+  ) {
+    // Phase 7 added the annual column to an already-seeded table.
+    const annual = TAX_BRACKETS_2023.filter((r) => r.frequency === "ANNUAL");
+    await prisma.taxBracket.createMany({
+      data: annual.map((r) => ({ effectiveFrom: taxFrom, ...r })),
+    });
+    console.log(`BIR annual table ${TAX_TABLE_EFFECTIVE_FROM}: ${annual.length} rows added.`);
   }
   let components = 0;
   for (const c of PAY_COMPONENTS) {

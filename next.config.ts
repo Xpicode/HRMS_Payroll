@@ -54,6 +54,7 @@ const nextConfig: NextConfig = {
     "tesseract.js", // spawns a worker_thread from its own files; must not be bundled
     "playwright", // launches Chromium for payslip PDFs
     "playwright-core",
+    "nodemailer", // SMTP outbox (Phase 7)
   ],
   // The OCR engine loads its WASM core and language model by path at runtime, so the
   // standalone build has to carry those files explicitly.

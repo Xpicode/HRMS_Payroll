@@ -37,6 +37,10 @@ async function handlerFor(type: JobType): Promise<JobHandler> {
       const mod = await import("@/modules/leave/service");
       return mod.rolloverJob;
     }
+    case "SEND_PAYSLIP_EMAIL": {
+      const mod = await import("@/modules/email/service");
+      return mod.sendPayslipEmailsJob;
+    }
   }
 }
 

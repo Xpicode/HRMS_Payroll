@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
-import type { PayComponentKind, PayFrequency } from "@/generated/prisma/enums";
+import type { PayComponentKind, PayFrequency, PayPeriodType } from "@/generated/prisma/enums";
 import { AppError } from "@/lib/action-result";
 import { scoped, type Scope, type ScopedDb, type ScopedTx } from "@/lib/scope";
 import { toDateOnly } from "@/lib/dates";
@@ -106,8 +106,65 @@ export function findFrozenOverlapping(db: Db, companyId: string, start: string, 
   });
 }
 
+/** Latest regular period (13th-month periods do not advance the cutoff sequence). */
 export function latestPeriod(db: Db, companyId: string) {
-  return db.payPeriod.findFirst({ where: { companyId }, orderBy: { coverageStart: "desc" } });
+  return db.payPeriod.findFirst({
+    where: { companyId, type: "REGULAR" },
+    orderBy: { coverageStart: "desc" },
+  });
+}
+
+/** Periods of a type whose coverage ends inside a date range, oldest first. */
+export function listPeriodsEndingBetween(
+  db: Db,
+  companyId: string,
+  start: string,
+  end: string,
+  type?: PayPeriodType,
+) {
+  return db.payPeriod.findMany({
+    where: {
+      companyId,
+      ...(type ? { type } : {}),
+      coverageEnd: { gte: toDateOnly(start), lte: toDateOnly(end) },
+    },
+    orderBy: { coverageStart: "asc" },
+  });
+}
+
+/**
+ * Per-employee sum of one component's lines over a set of periods — the 13th-month basis and
+ * the reports' cross-check read exactly this.
+ */
+export async function sumLinesByEmployee(
+  db: Db,
+  companyId: string,
+  payPeriodIds: string[],
+  componentCode: string,
+) {
+  if (payPeriodIds.length === 0) return [];
+  const rows = await db.payslipLine.groupBy({
+    by: ["payslipId"],
+    where: { companyId, componentCode, payslip: { payPeriodId: { in: payPeriodIds } } },
+    _sum: { amount: true },
+  });
+  const slips = await db.payslip.findMany({
+    where: { companyId, id: { in: rows.map((r) => r.payslipId) } },
+    select: { id: true, employeeId: true, payPeriodId: true },
+  });
+  const byId = new Map(slips.map((s) => [s.id, s]));
+  return rows.flatMap((r) => {
+    const slip = byId.get(r.payslipId);
+    return slip
+      ? [
+          {
+            employeeId: slip.employeeId,
+            payPeriodId: slip.payPeriodId,
+            amount: r._sum.amount?.toString() ?? "0.00",
+          },
+        ]
+      : [];
+  });
 }
 
 export function getPeriod(db: Db, companyId: string, id: string) {
@@ -117,9 +174,14 @@ export function getPeriod(db: Db, companyId: string, id: string) {
   });
 }
 
-export function findPeriodByStart(db: Db, companyId: string, coverageStart: string) {
+export function findPeriodByStart(
+  db: Db,
+  companyId: string,
+  coverageStart: string,
+  type: PayPeriodType = "REGULAR",
+) {
   return db.payPeriod.findFirst({
-    where: { companyId, coverageStart: toDateOnly(coverageStart) },
+    where: { companyId, type, coverageStart: toDateOnly(coverageStart) },
   });
 }
 
@@ -132,11 +194,13 @@ export function createPeriod(
     payDate: string;
     frequency: PayFrequency;
     sequenceInMonth: number;
+    type?: PayPeriodType;
   },
 ) {
   return db.payPeriod.create({
     data: {
       companyId,
+      type: data.type ?? "REGULAR",
       coverageStart: toDateOnly(data.coverageStart),
       coverageEnd: toDateOnly(data.coverageEnd),
       payDate: toDateOnly(data.payDate),
@@ -384,6 +448,21 @@ export async function createAdjustment(
 ) {
   await assertPeriodMutable(tx, companyId, data.payPeriodId);
   return tx.payrollAdjustment.create({ data: { companyId, ...data } });
+}
+
+/** Remove one employee's adjustments with the given component codes in a period (annualization re-apply). */
+export async function deleteAdjustmentsByCode(
+  tx: ScopedTx,
+  companyId: string,
+  payPeriodId: string,
+  employeeId: string,
+  codes: readonly string[],
+) {
+  await assertPeriodMutable(tx, companyId, payPeriodId);
+  const r = await tx.payrollAdjustment.deleteMany({
+    where: { companyId, payPeriodId, employeeId, componentCode: { in: [...codes] } },
+  });
+  return r.count;
 }
 
 export async function deleteAdjustment(tx: ScopedTx, companyId: string, id: string) {

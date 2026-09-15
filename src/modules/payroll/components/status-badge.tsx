@@ -1,4 +1,4 @@
-import type { PayPeriodStatus } from "@/generated/prisma/enums";
+import type { PayPeriodStatus, PayPeriodType } from "@/generated/prisma/enums";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { PERIOD_STATUS_LABELS } from "../schema";
@@ -10,6 +10,15 @@ const STYLE: Record<PayPeriodStatus, string> = {
   RELEASED: "border-success/60 bg-success/20 text-success",
   LOCKED: "border-foreground/30 bg-foreground/10 text-foreground",
 };
+
+export function PeriodTypeBadge({ type }: { type: PayPeriodType }) {
+  if (type !== "THIRTEENTH_MONTH") return null;
+  return (
+    <Badge variant="outline" className="border-brand/40 bg-brand/10 text-brand-foreground">
+      13th month
+    </Badge>
+  );
+}
 
 export function PeriodStatusBadge({
   status,

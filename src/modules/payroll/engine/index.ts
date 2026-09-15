@@ -17,3 +17,4 @@ export {
 export { computeWithholdingTax, type TaxComputation } from "./tax";
 export { applyLoans } from "./loans";
 export { computePayslip } from "./payslip";
+export { computeThirteenthMonth, THIRTEENTH_MONTH_NON_TAXABLE_CEILING } from "./thirteenth";
