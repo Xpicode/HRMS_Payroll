@@ -334,6 +334,85 @@ describe("the employee sees only their own data", () => {
   });
 });
 
+describe("creating an employee with portal access in one step", () => {
+  const base = {
+    employeeNo: null,
+    lastName: "Cruz",
+    firstName: "Carla",
+    middleName: null,
+    suffix: null,
+    birthDate: null,
+    hireDate: "2026-09-01",
+    separationDate: null,
+    status: "ACTIVE" as const,
+    position: null,
+    department: null,
+    mobile: null,
+    address: null,
+    sssNo: null,
+    philhealthNo: null,
+    pagibigMid: null,
+    tin: null,
+    taxStatus: "S" as const,
+  };
+
+  it("writes the employee and the login together; the email falls back to the employee's", async () => {
+    const row = await employees.createEmployee(
+      officer,
+      companyId,
+      { ...base, employeeNo: `${TAG}-0003`, email: `${TAG.toLowerCase()}-carla@example.com` },
+      { confirmWarnings: true },
+      { email: null, password: "Carla-Portal-2026" },
+    );
+    const login = await auth.getEmployeeLogin(officer, companyId, row.id);
+    expect(login?.email).toBe(`${TAG.toLowerCase()}-carla@example.com`);
+    expect(login?.mustChangePassword).toBe(true);
+  });
+
+  it("a taken email rolls the employee back too, and an encoder cannot add a login", async () => {
+    const before = await prisma.employee.count({ where: { companyId } });
+    await expect(
+      employees.createEmployee(
+        officer,
+        companyId,
+        { ...base, employeeNo: `${TAG}-0004`, firstName: "Dup", email: null },
+        { confirmWarnings: true },
+        { email: `${TAG.toLowerCase()}-carla@example.com`, password: "Dup-Portal-2026x" },
+      ),
+    ).rejects.toMatchObject({ fieldErrors: { portalEmail: ["Already in use"] } });
+    await expect(
+      employees.createEmployee(
+        officer,
+        companyId,
+        { ...base, employeeNo: `${TAG}-0005`, firstName: "NoMail", email: null },
+        { confirmWarnings: true },
+        { email: null, password: "NoMail-Portal-2026" },
+      ),
+    ).rejects.toThrow(/sign-in email/);
+    const encoder: Scope = {
+      userId: officerId,
+      role: "ENCODER",
+      companyIds: [companyId],
+      ip: null,
+    };
+    await expect(
+      employees.createEmployee(
+        encoder,
+        companyId,
+        {
+          ...base,
+          employeeNo: `${TAG}-0006`,
+          firstName: "Enc",
+          email: `${TAG.toLowerCase()}-enc@example.com`,
+        },
+        { confirmWarnings: true },
+        { email: null, password: "Enc-Portal-2026xx" },
+      ),
+    ).rejects.toThrow(FORBIDDEN);
+    expect(await prisma.employee.count({ where: { companyId } })).toBe(before);
+  });
+});
+
 describe("lifecycle of the login", () => {
   it("reset and disable/enable are audited and take effect", async () => {
     const reset = await auth.resetEmployeeLogin(officer, companyId, aliceId, {

@@ -7,7 +7,12 @@ import { toDateOnly, toIsoDate, todayInManila } from "@/lib/dates";
 import { assertCompanyAccess, type Scope } from "@/lib/scope";
 import { assertPermission, assertPermissionOrSelf } from "@/lib/session";
 import { getCompany } from "@/modules/companies/service";
-import { disableEmployeeLogin } from "@/modules/auth/service";
+import {
+  assertLoginEmailFree,
+  createEmployeeLoginWithin,
+  disableEmployeeLogin,
+} from "@/modules/auth/service";
+import { hashPassword } from "@/lib/password";
 import * as repo from "./repo";
 import {
   CSV_COLUMNS,
@@ -139,22 +144,46 @@ export async function getRateContext(scope: Scope, companyId: string) {
 
 export type SaveOptions = { confirmWarnings: boolean };
 
+/** Portal login to create together with the employee (Phase 9); `null` = none. */
+export type PortalLoginRequest = { email: string | null; password: string } | null;
+
 export async function createEmployee(
   scope: Scope,
   companyId: string,
   input: EmployeeInput,
   opts: SaveOptions,
+  portal: PortalLoginRequest = null,
 ) {
   assertPermission(scope, "employees.manage");
   assertCompanyAccess(scope, companyId);
   const warnings = governmentIdWarnings(input);
   if (warnings.length && !opts.confirmWarnings) throw new NeedsConfirmError(warnings);
 
+  // Resolve and check the login before the transaction: bcrypt is slow and the email must be free.
+  let login: { email: string; passwordHash: string } | null = null;
+  if (portal) {
+    assertPermission(scope, "employees.portal_access");
+    const email = portal.email ?? input.email;
+    if (!email)
+      throw new AppError("Enter a sign-in email for the portal login.", {
+        portalEmail: ["Required when the employee has no email"],
+      });
+    try {
+      await assertLoginEmailFree(email);
+    } catch (e) {
+      if (e instanceof AppError && e.fieldErrors?.email)
+        throw new AppError(e.message, { portalEmail: e.fieldErrors.email });
+      throw e;
+    }
+    login = { email, passwordHash: await hashPassword(portal.password) };
+  }
+
   try {
     return await repo.transaction(scope, async (tx) => {
       const employeeNo = input.employeeNo ?? (await repo.allocateEmployeeNo(tx, companyId));
       const row = await repo.createEmployee(tx, companyId, toEmployeeRow(input, employeeNo));
       await audit("Employee", row.id, "CREATE", null, row, { scope, companyId, tx });
+      if (login) await createEmployeeLoginWithin(tx, scope, companyId, row, login);
       return row;
     });
   } catch (e) {

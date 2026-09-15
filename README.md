@@ -329,10 +329,11 @@ docker/                  dev image + entrypoint
 
 ## Employee self-service portal (Phase 9)
 
-- **Who**: an `EMPLOYEE` login is a `users` row with `employee_id` set (one per employee, unique). It is created
-  from the employee's **Details** page (card "Portal access": sign-in email + temporary password) by an ADMIN or a
-  PAYROLL_OFFICER of that company, reset or disabled from the same card, and **disabled automatically when the
-  employee is separated** (same transaction, audited as a User change). The Users screen lists these logins but
+- **Who**: an `EMPLOYEE` login is a `users` row with `employee_id` set (one per employee, unique). An ADMIN or a
+  PAYROLL_OFFICER of the company creates it either **while adding the employee** (the New employee form has a
+  "Create portal access now" block; employee and login are written in one transaction) or later from the
+  employee's **Details** page (card "Portal access": sign-in email + temporary password), resets or disables it
+  from that card, and it is **disabled automatically when the employee is separated** (same transaction, audited as a User change). The Users screen lists these logins but
   cannot edit them as staff; `EMPLOYEE` is not a role it can assign. Fresh installs seed one for the demo company:
   `dorothy@example.com` / `Dorothy-Demo-2026` (must be changed at first sign-in).
 - **Where**: `/me` (`src/app/me`, module `src/modules/self-service`) with its own shell — header nav on desktop,

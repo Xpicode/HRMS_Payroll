@@ -34,6 +34,7 @@ export default async function NewEmployeePage({
         companyId={companyId}
         departments={departments}
         nextEmployeeNo={series.next}
+        canCreateLogin={roleCan(user.role, "employees.portal_access")}
       />
     </>
   );

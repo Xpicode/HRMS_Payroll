@@ -9,6 +9,7 @@ import {
   AppError,
   NeedsConfirmError,
   fail,
+  fieldErrorsFromZod,
   formToObject,
   formValues,
   invalid,
@@ -16,6 +17,7 @@ import {
   type ActionResult,
 } from "@/lib/action-result";
 import {
+  employeePortalSchema,
   employeeSchema,
   endRecurringItemSchema,
   paySettingSchema,
@@ -47,20 +49,35 @@ export async function createEmployeeAction(
   formData: FormData,
 ): Promise<ActionResult> {
   if (!isUuid(companyId)) return fail("Invalid company.");
-  const parsed = employeeSchema.safeParse(formToObject(formData));
-  if (!parsed.success) return withValues(invalid(parsed.error), formData);
+  const raw = formToObject(formData);
+  const parsed = employeeSchema.safeParse(raw);
+  const portal = employeePortalSchema.safeParse(raw);
+  if (!parsed.success || !portal.success) {
+    const errors = {
+      ...(parsed.success ? {} : fieldErrorsFromZod(parsed.error)),
+      ...(portal.success ? {} : fieldErrorsFromZod(portal.error)),
+    };
+    return withValues(fail("Please check the form.", errors), formData);
+  }
+  const login = portal.data.createLogin
+    ? { email: portal.data.portalEmail, password: portal.data.portalPassword! }
+    : null;
   let id: string;
   try {
     const scope = await getScope();
-    const row = await service.createEmployee(scope, companyId, parsed.data, {
-      confirmWarnings: confirmed(formData),
-    });
+    const row = await service.createEmployee(
+      scope,
+      companyId,
+      parsed.data,
+      { confirmWarnings: confirmed(formData) },
+      login,
+    );
     id = row.id;
   } catch (e) {
     return withValues(handleError(e), formData);
   }
   revalidatePath(`/app/${companyId}/employees`);
-  redirect(`/app/${companyId}/employees/${id}/pay?created=1`);
+  redirect(`/app/${companyId}/employees/${id}/pay?created=1${login ? "&login=1" : ""}`);
 }
 
 export async function updateEmployeeAction(

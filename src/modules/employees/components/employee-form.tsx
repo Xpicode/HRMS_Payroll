@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { AlertTriangleIcon } from "lucide-react";
+import { AlertTriangleIcon, MonitorSmartphoneIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,15 @@ type Props = {
   companyId: string;
   departments: string[];
   nextEmployeeNo: string;
-} & ({ mode: "create"; employee?: undefined } | { mode: "edit"; employee: EmployeeFormValues });
+} & (
+  | {
+      mode: "create";
+      employee?: undefined;
+      /** ADMIN / PAYROLL_OFFICER: offer to create the self-service login in the same step. */
+      canCreateLogin?: boolean;
+    }
+  | { mode: "edit"; employee: EmployeeFormValues; canCreateLogin?: undefined }
+);
 
 export function EmployeeForm(props: Props) {
   const action =
@@ -69,6 +77,7 @@ export function EmployeeForm(props: Props) {
   );
   const d = (name: keyof EmployeeFormValues, fallback: string | null | undefined) =>
     v?.[name] ?? fallback ?? "";
+  const [createLogin, setCreateLogin] = useState(v?.createLogin === "on");
 
   return (
     <form action={formAction} noValidate>
@@ -344,10 +353,73 @@ export function EmployeeForm(props: Props) {
                 </Field>
               </FieldGrid>
             </div>
+
+            {props.mode === "create" && props.canCreateLogin ? (
+              <>
+                <Separator />
+                <div>
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="createLogin"
+                      className="mt-0.5 size-4 accent-primary"
+                      checked={createLogin}
+                      onChange={(ev) => setCreateLogin(ev.target.checked)}
+                    />
+                    <span>
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                        <MonitorSmartphoneIcon className="size-4 text-primary" />
+                        Create portal access now
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        The employee can sign in to see their own payslips, attendance and leave.
+                        You can also do this later from the Details page.
+                      </span>
+                    </span>
+                  </label>
+                  {createLogin ? (
+                    <FieldGrid className="mt-4">
+                      <Field
+                        label="Sign-in email"
+                        name="portalEmail"
+                        error={errors?.portalEmail}
+                        hint="Blank = the employee's email above."
+                      >
+                        <Input
+                          id="portalEmail"
+                          name="portalEmail"
+                          type="email"
+                          defaultValue={v?.portalEmail ?? ""}
+                          autoComplete="off"
+                        />
+                      </Field>
+                      <Field
+                        label="Temporary password"
+                        name="portalPassword"
+                        error={errors?.portalPassword}
+                        required
+                        hint="At least 12 characters with a letter and a digit; changed at first sign-in."
+                      >
+                        <Input
+                          id="portalPassword"
+                          name="portalPassword"
+                          type="password"
+                          autoComplete="new-password"
+                        />
+                      </Field>
+                    </FieldGrid>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
           </CardContent>
           <CardFooter className="justify-end">
             <SubmitButton pendingText="Saving…">
-              {props.mode === "create" ? "Create employee" : "Save changes"}
+              {props.mode === "create"
+                ? createLogin
+                  ? "Create employee and login"
+                  : "Create employee"
+                : "Save changes"}
             </SubmitButton>
           </CardFooter>
         </Card>

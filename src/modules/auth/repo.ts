@@ -31,6 +31,18 @@ export const userWithCompanies = {
   },
 } as const;
 
+export type UserRow = Prisma.UserGetPayload<{ select: typeof userWithCompanies }>;
+
+/** Any client that can create users: the raw transaction or a scoped() one (User is not a tenant model). */
+export type UserCreator = {
+  user: {
+    create(args: {
+      data: Prisma.UserCreateInput;
+      select: typeof userWithCompanies;
+    }): Promise<UserRow>;
+  };
+};
+
 /** Any client that can update users: the raw transaction or a scoped() one (User is not a tenant model). */
 export type UserWriter = {
   user: {
@@ -125,8 +137,8 @@ export function createUser(
     companyIds: string[];
     employeeId?: string | null;
   },
-  tx: TxClient = prisma,
-) {
+  tx: UserCreator = prisma,
+): Promise<UserRow> {
   return tx.user.create({
     data: {
       email: data.email,
@@ -134,7 +146,7 @@ export function createUser(
       role: data.role,
       passwordHash: data.passwordHash,
       mustChangePassword: data.mustChangePassword,
-      employeeId: data.employeeId ?? null,
+      ...(data.employeeId ? { employee: { connect: { id: data.employeeId } } } : {}),
       companies: { create: data.companyIds.map((companyId) => ({ companyId })) },
     },
     select: userWithCompanies,

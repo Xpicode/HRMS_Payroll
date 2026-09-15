@@ -277,32 +277,73 @@ export async function createEmployeeLogin(
     throw new AppError("A separated employee cannot be given portal access.");
   if (await repo.findUserByEmployeeId(employeeId))
     throw new AppError("This employee already has a login.");
-  if (await repo.findUserByEmail(input.email))
-    throw new AppError("That email is already in use.", { email: ["Already in use"] });
+  await assertLoginEmailFree(input.email);
   const passwordHash = await hashPassword(input.password);
-  return repo.transaction(async (tx) => {
-    const user = await repo.createUser(
-      {
-        email: input.email,
-        name: `${employee.firstName} ${employee.lastName}`.trim(),
-        role: "EMPLOYEE",
-        passwordHash,
-        mustChangePassword: true,
-        companyIds: [companyId],
-        employeeId,
-      },
-      tx,
-    );
-    await audit(
-      "User",
-      user.id,
-      "CREATE",
-      null,
-      { email: user.email, role: user.role, employeeId, employeeNo: employee.employeeNo },
-      { scope, companyId, tx },
-    );
-    return toLoginView(user);
-  });
+  return repo.transaction((tx) =>
+    insertEmployeeLogin(tx, scope, companyId, employee, input.email, passwordHash),
+  );
+}
+
+/** Field error on `email` when another login already uses it. */
+export async function assertLoginEmailFree(email: string): Promise<void> {
+  if (await repo.findUserByEmail(email))
+    throw new AppError("That email is already in use.", { email: ["Already in use"] });
+}
+
+type LoginEmployee = { id: string; employeeNo: string; firstName: string; lastName: string };
+
+async function insertEmployeeLogin(
+  tx: repo.UserCreator & AuditWriter,
+  scope: Scope,
+  companyId: string,
+  employee: LoginEmployee,
+  email: string,
+  passwordHash: string,
+) {
+  const user = await repo.createUser(
+    {
+      email,
+      name: `${employee.firstName} ${employee.lastName}`.trim(),
+      role: "EMPLOYEE",
+      passwordHash,
+      mustChangePassword: true,
+      companyIds: [companyId],
+      employeeId: employee.id,
+    },
+    tx,
+  );
+  await audit(
+    "User",
+    user.id,
+    "CREATE",
+    null,
+    {
+      email: user.email,
+      role: user.role,
+      employeeId: employee.id,
+      employeeNo: employee.employeeNo,
+    },
+    { scope, companyId, tx },
+  );
+  return toLoginView(user);
+}
+
+/**
+ * Called by the employees module while it creates a new employee: the login is written in the
+ * same transaction, so a rejected login (duplicate email) rolls the employee back too. The
+ * caller must have hashed the password before opening the transaction (bcrypt is slow).
+ */
+export async function createEmployeeLoginWithin(
+  tx: repo.UserCreator & AuditWriter,
+  scope: Scope,
+  companyId: string,
+  employee: LoginEmployee,
+  login: { email: string; passwordHash: string },
+) {
+  assertPermission(scope, "employees.portal_access");
+  assertCompanyAccess(scope, companyId);
+  await assertLoginEmailFree(login.email);
+  return insertEmployeeLogin(tx, scope, companyId, employee, login.email, login.passwordHash);
 }
 
 async function existingLogin(scope: Scope, companyId: string, employeeId: string) {

@@ -30,7 +30,7 @@ export default async function PaySettingsPage({
   searchParams,
 }: {
   params: Promise<{ companyId: string; employeeId: string }>;
-  searchParams: Promise<{ created?: string; saved?: string }>;
+  searchParams: Promise<{ created?: string; saved?: string; login?: string }>;
 }) {
   const { companyId, employeeId } = await params;
   const { user, company } = await requireCompany(companyId);
@@ -64,7 +64,9 @@ export default async function PaySettingsPage({
       {sp.created ? (
         <Alert className="mb-6 border-success/30 bg-success/5 text-success">
           <AlertTitle>
-            Employee created. Add the first pay setting below so payroll can compute.
+            Employee created
+            {sp.login ? " with a portal login (tell them the temporary password in person)" : ""}.
+            Add the first pay setting below so payroll can compute.
           </AlertTitle>
         </Alert>
       ) : sp.saved ? (
