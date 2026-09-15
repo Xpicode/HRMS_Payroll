@@ -78,6 +78,8 @@ COPY --from=build --chown=pwuser:pwuser /app/public ./public
 # Migrations + seed (run by the entrypoint before the server starts)
 COPY --from=tools --chown=pwuser:pwuser /tools/node_modules ./tools/node_modules
 COPY --from=build --chown=pwuser:pwuser /app/src/generated ./tools/src/generated
+# The seed imports the password helpers (EMPLOYEE_TEMP_PASSWORD); bcryptjs is in tools/node_modules.
+COPY --chown=pwuser:pwuser src/lib/password.ts ./tools/src/lib/password.ts
 COPY --chown=pwuser:pwuser prisma ./tools/prisma
 COPY --chown=pwuser:pwuser prisma.config.ts ./tools/prisma.config.ts
 

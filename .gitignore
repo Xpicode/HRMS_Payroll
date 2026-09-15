@@ -57,3 +57,4 @@ next-env.d.ts
 
 # local dev TLS certificate (pnpm dev:https, see README)
 /certificates/
+/.env.lan-test
