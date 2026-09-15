@@ -8,7 +8,7 @@ import { signIn, signOut } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { getLimiter } from "@/lib/rate-limit";
 import { clientIp, isUuid, safeRelativePath } from "@/lib/request";
-import { getScope } from "@/lib/session";
+import { getAccountScope, getScope } from "@/lib/session";
 import {
   AppError,
   fail,
@@ -26,10 +26,18 @@ import {
 } from "./schema";
 import * as service from "./service";
 
-function loginLimiter() {
+/** Two throttles before any bcrypt work: per client IP and per account (email). */
+function loginLimiters() {
   const cfg = env();
-  return getLimiter("login-ip", cfg.LOGIN_MAX_ATTEMPTS_PER_IP, cfg.LOGIN_WINDOW_SECONDS * 1000);
+  const windowMs = cfg.LOGIN_WINDOW_SECONDS * 1000;
+  return {
+    ip: getLimiter("login-ip", cfg.LOGIN_MAX_ATTEMPTS_PER_IP, windowMs),
+    account: getLimiter("login-account", cfg.LOGIN_MAX_ATTEMPTS_PER_ACCOUNT, windowMs),
+  };
 }
+
+const tooMany = (retryAfterMs: number) =>
+  fail(`Too many login attempts. Try again in ${Math.ceil(retryAfterMs / 60000)} minute(s).`);
 
 const LOGIN_MESSAGES: Record<string, string> = {
   invalid: "Invalid email or password.",
@@ -42,12 +50,11 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
   if (!parsed.success) return invalid(parsed.error);
 
   const ip = clientIp(await headers()) ?? "unknown";
-  const limited = loginLimiter().consume(ip);
-  if (!limited.ok) {
-    return fail(
-      `Too many login attempts. Try again in ${Math.ceil(limited.retryAfterMs / 60000)} minute(s).`,
-    );
-  }
+  const limiters = loginLimiters();
+  const byIp = limiters.ip.consume(ip);
+  if (!byIp.ok) return tooMany(byIp.retryAfterMs);
+  const byAccount = limiters.account.consume(parsed.data.email);
+  if (!byAccount.ok) return tooMany(byAccount.retryAfterMs);
 
   try {
     await signIn("credentials", {
@@ -63,6 +70,7 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
     throw e;
   }
 
+  limiters.account.reset(parsed.data.email);
   const callbackUrl = safeRelativePath(String(formData.get("callbackUrl") ?? ""), "/app");
   redirect(await service.postLoginDestination(parsed.data.email, callbackUrl));
 }
@@ -136,7 +144,7 @@ export async function changePasswordAction(
   const parsed = changePasswordSchema.safeParse(formToObject(formData));
   if (!parsed.success) return invalid(parsed.error);
   try {
-    const scope = await getScope();
+    const scope = await getAccountScope();
     await service.changeOwnPassword(scope, parsed.data);
   } catch (e) {
     return handleError(e);

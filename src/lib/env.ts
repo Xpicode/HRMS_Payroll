@@ -13,8 +13,12 @@ const schema = z.object({
   ADMIN_EMAIL: z.email().optional(),
   ADMIN_NAME: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),
+  /** Absolute session lifetime: re-authenticate after this long no matter how active. */
   SESSION_MAX_AGE_SECONDS: z.coerce.number().int().min(300).max(86400).default(28800),
+  /** Idle timeout: a session with no request for this long expires (≤ the absolute lifetime). */
+  SESSION_IDLE_SECONDS: z.coerce.number().int().min(300).max(86400).default(7200),
   LOGIN_MAX_ATTEMPTS_PER_IP: z.coerce.number().int().min(1).default(20),
+  LOGIN_MAX_ATTEMPTS_PER_ACCOUNT: z.coerce.number().int().min(1).default(15),
   LOGIN_WINDOW_SECONDS: z.coerce.number().int().min(10).default(900),
   ACCOUNT_LOCK_AFTER_FAILURES: z.coerce.number().int().min(1).default(10),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).default(15),

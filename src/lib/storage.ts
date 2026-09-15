@@ -9,7 +9,8 @@ import { env } from "@/lib/env";
  * authenticated, company-scoped route handlers.
  */
 export function dataDir(): string {
-  return path.resolve(process.cwd(), env().DATA_DIR);
+  // turbopackIgnore: DATA_DIR is runtime configuration, not a folder to trace into the build
+  return path.resolve(/* turbopackIgnore: true */ process.cwd(), env().DATA_DIR);
 }
 
 const SAFE_SEGMENT = /^[A-Za-z0-9._-]{1,128}$/;
@@ -25,7 +26,7 @@ export function resolveDataPath(...segments: string[]): string {
     }
   }
   const base = dataDir();
-  const full = path.resolve(base, ...segments);
+  const full = path.resolve(/* turbopackIgnore: true */ base, ...segments);
   if (!full.startsWith(base + path.sep) && full !== base) {
     throw new Error("Resolved path escapes DATA_DIR");
   }

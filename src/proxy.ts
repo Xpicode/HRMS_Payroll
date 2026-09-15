@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/lib/auth.config";
+import { sessionExpired } from "@/lib/session-age";
 
 /**
  * Optimistic auth gate (cookie only, no database):
@@ -16,7 +17,7 @@ export default auth((req) => {
   const isProtected = pathname.startsWith("/app") || pathname.startsWith("/api/files");
   if (!isProtected) return NextResponse.next();
 
-  const user = req.auth?.user;
+  const user = req.auth && !sessionExpired(req.auth.issuedAt) ? req.auth.user : undefined;
   if (!user) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

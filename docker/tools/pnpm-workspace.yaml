@@ -1,0 +1,8 @@
+# Standalone install (not part of the app workspace): a plain node_modules tree the
+# production image copies as-is, so prisma/tsx resolve without pnpm's symlink store.
+nodeLinker: hoisted
+allowBuilds:
+  "@prisma/engines": true
+  prisma: true
+  "@prisma/client": true
+  esbuild: true

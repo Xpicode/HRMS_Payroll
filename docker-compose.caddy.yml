@@ -1,0 +1,28 @@
+# Overlay for a Linux VPS: Caddy terminates HTTPS in front of the app.
+#
+#   COMPOSE_FILE=docker-compose.prod.yml:docker-compose.caddy.yml SITE_ADDRESS=payroll.example.com docker compose up -d
+#
+# With Caddy in front the app no longer needs a host port; APP_BIND/APP_PORT are ignored here.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS (public hostname) in the environment or .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - hrms_caddy_data:/data
+      - hrms_caddy_config:/config
+
+  app:
+    ports: !reset []
+
+volumes:
+  hrms_caddy_data:
+  hrms_caddy_config:

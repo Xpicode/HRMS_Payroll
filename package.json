@@ -27,7 +27,9 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "backup": "bash scripts/backup.sh"
+    "backup": "bash scripts/backup.sh",
+    "restore": "bash scripts/restore.sh",
+    "load-check": "vitest run --config vitest.load.config.mts"
   },
   "dependencies": {
     "@auth/core": "0.41.3",

@@ -45,6 +45,7 @@ const eslintConfig = defineConfig([
       "src/lib/audit.ts",
       "src/lib/auth.ts",
       "src/lib/session.ts",
+      "src/lib/health.ts",
       "prisma/**/*.ts",
       "src/app/api/**/*.ts",
       "tests/**/*.ts",

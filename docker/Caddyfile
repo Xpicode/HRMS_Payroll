@@ -1,0 +1,16 @@
+# Reverse proxy for a Linux VPS (docker-compose.caddy.yml). Automatic HTTPS via Let's Encrypt for
+# SITE_ADDRESS. Security headers come from the app itself; Caddy only terminates TLS and forwards
+# the client address so the audit log records it.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	request_body {
+		max_size 12MB
+	}
+	reverse_proxy app:8080 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+		transport http {
+			read_timeout 300s
+		}
+	}
+}

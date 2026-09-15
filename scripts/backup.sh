@@ -7,10 +7,9 @@
 # (otherwise `pg_dump` from PATH against DATABASE_URL); the data tarball comes from the
 # compose `app` container's /data when it is up (otherwise from DATA_DIR on the host).
 # Reads .env for POSTGRES_* / DATABASE_URL / DATA_DIR / BACKUP_DIR / BACKUP_KEEP_DAYS.
+# For a production stack set COMPOSE_FILE=docker-compose.prod.yml (docker compose reads it).
 #
-# Restore (compose):
-#   gunzip -c backups/hrms-db-<stamp>.sql.gz | docker compose exec -T db psql -U hrms -d hrms
-#   docker compose exec -T app sh -c 'rm -rf /data/* && tar xzf - -C /data' < backups/hrms-data-<stamp>.tgz
+# Restore: bash scripts/restore.sh backups/hrms-db-<stamp>.sql.gz backups/hrms-data-<stamp>.tgz
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

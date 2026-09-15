@@ -1,6 +1,6 @@
 # Development image. Playwright's base image ships Chromium and its system
 # dependencies, which Phase 5 (PDF rendering) needs. Node comes with the image.
-# The production multi-stage, non-root image is a Phase 8 deliverable.
+# The production image is docker/Dockerfile (multi-stage, non-root; see docs/deployment.md).
 FROM mcr.microsoft.com/playwright:v1.63.0-noble
 
 ENV PNPM_HOME=/pnpm \

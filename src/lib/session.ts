@@ -8,6 +8,7 @@ import { clientIp, isUuid } from "@/lib/request";
 import type { Scope } from "@/lib/scope";
 import { roleCan, type Permission } from "@/lib/permissions";
 import { ForbiddenError } from "@/lib/action-result";
+import { sessionExpired } from "@/lib/session-age";
 import type { Role } from "@/generated/prisma/enums";
 
 export type CompanySummary = {
@@ -38,13 +39,15 @@ const companySelect = {
 
 /**
  * Loads the current user from the database once per request (React `cache`).
- * Returns null when there is no session, the user is disabled, or the session
- * pre-dates the user's last password change (server-side revocation of JWT sessions).
+ * Returns null when there is no session, the session is older than the absolute lifetime,
+ * the user is disabled, or the session pre-dates the user's last password change
+ * (server-side revocation of JWT sessions).
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await auth();
   const id = session?.user?.id;
   if (!id || !isUuid(id)) return null;
+  if (sessionExpired(session.issuedAt)) return null;
 
   const user = await prisma.user.findUnique({
     where: { id },
@@ -107,9 +110,7 @@ export async function requireCompany(
   return { user, company };
 }
 
-/** The scope object passed to services and repos. Built from the session, never from input. */
-export const getScope = cache(async (): Promise<Scope> => {
-  const user = await requireUser();
+async function scopeFor(user: CurrentUser): Promise<Scope> {
   const h = await headers();
   return {
     userId: user.id,
@@ -117,7 +118,23 @@ export const getScope = cache(async (): Promise<Scope> => {
     companyIds: user.role === "ADMIN" ? null : user.companies.map((c) => c.id),
     ip: clientIp(h),
   };
+}
+
+/**
+ * The scope object passed to services and repos. Built from the session, never from input.
+ * A user who still has to change a temporary password gets no scope: the proxy already
+ * redirects their page loads, and this stops server actions posted directly.
+ */
+export const getScope = cache(async (): Promise<Scope> => {
+  const user = await requireUser();
+  if (user.mustChangePassword) {
+    throw new ForbiddenError("Change your temporary password before continuing.");
+  }
+  return scopeFor(user);
 });
+
+/** Scope for the account screens only (changing one's own password): no must-change gate. */
+export const getAccountScope = cache(async (): Promise<Scope> => scopeFor(await requireUser()));
 
 /** For services: throws (actions turn it into a friendly error). */
 export function assertPermission(scope: Scope, permission: Permission): void {

@@ -3,6 +3,7 @@ import { formatDateOnly, isIsoDate, toDateOnly, toIsoDate, todayInManila } from 
 import { checkPasswordPolicy, hashPassword, verifyPassword } from "@/lib/password";
 import { SlidingWindowLimiter } from "@/lib/rate-limit";
 import { clientIp, isUuid, safeRelativePath } from "@/lib/request";
+import { sessionExpired, sessionIdleSeconds, sessionMaxAgeSeconds } from "@/lib/session-age";
 
 describe("dates", () => {
   it("round-trips ISO dates at UTC midnight", () => {
@@ -34,6 +35,19 @@ describe("password", () => {
     expect(checkPasswordPolicy("neriza-2026-ok", "neriza@upright.ph").ok).toBe(false);
     expect(checkPasswordPolicy("Correct-Horse-42", "neriza@upright.ph").ok).toBe(true);
   });
+  it("rejects repeats and straight runs (Phase 8)", () => {
+    expect(checkPasswordPolicy("Aaaaa-strong-1").ok).toBe(false); // "aaaa"
+    expect(checkPasswordPolicy("Strong-12345-x").ok).toBe(false); // ascending digits
+    expect(checkPasswordPolicy("Strong-54321-x").ok).toBe(false); // descending digits
+    expect(checkPasswordPolicy("Strong-abcde-1").ok).toBe(false); // ascending letters
+    expect(checkPasswordPolicy("Strong-qwert-1").ok).toBe(false); // keyboard row
+    expect(checkPasswordPolicy("Strong-trewq-1").ok).toBe(false); // keyboard row reversed
+    expect(checkPasswordPolicy("Aaa-1234-fine-99").ok).toBe(true); // 3 repeats / 4-run are allowed
+    expect(checkPasswordPolicy("Test-Admin-2026").ok).toBe(true);
+    const r = checkPasswordPolicy("11111111111a");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reasons).toContain("No character repeated 4 or more times in a row");
+  });
   it("hashes and verifies", async () => {
     const h = await hashPassword("Correct-Horse-42");
     expect(h.startsWith("$2")).toBe(true);
@@ -60,6 +74,31 @@ describe("rate limiter", () => {
     expect(l.consume("a", 0).ok).toBe(true);
     expect(l.consume("b", 0).ok).toBe(true);
     expect(l.consume("a", 1).ok).toBe(false);
+  });
+});
+
+describe("session age", () => {
+  it("expires by absolute age regardless of activity", () => {
+    expect(sessionExpired(1000, 1000 + 100, 3600)).toBe(false);
+    expect(sessionExpired(1000, 1000 + 3600, 3600)).toBe(false);
+    expect(sessionExpired(1000, 1000 + 3601, 3600)).toBe(true);
+  });
+  it("treats a missing or malformed issue time as expired", () => {
+    expect(sessionExpired(undefined, 10)).toBe(true);
+    expect(sessionExpired("123", 10)).toBe(true);
+    expect(sessionExpired(Number.NaN, 10)).toBe(true);
+  });
+  it("caps the idle timeout at the absolute lifetime and ignores junk env values", () => {
+    const saved = { ...process.env };
+    process.env.SESSION_MAX_AGE_SECONDS = "3600";
+    process.env.SESSION_IDLE_SECONDS = "7200";
+    expect(sessionIdleSeconds()).toBe(3600);
+    process.env.SESSION_MAX_AGE_SECONDS = "abc";
+    process.env.SESSION_IDLE_SECONDS = "-5";
+    expect(sessionMaxAgeSeconds()).toBe(28800);
+    expect(sessionIdleSeconds()).toBe(7200);
+    process.env.SESSION_MAX_AGE_SECONDS = saved.SESSION_MAX_AGE_SECONDS;
+    process.env.SESSION_IDLE_SECONDS = saved.SESSION_IDLE_SECONDS;
   });
 });
 

@@ -9,6 +9,7 @@ import {
   ClockIcon,
   ContactIcon,
   FileSpreadsheetIcon,
+  HistoryIcon,
   LayoutDashboardIcon,
   PlaneIcon,
   Settings2Icon,
@@ -30,6 +31,7 @@ const ICONS = {
   settings: Settings2Icon,
   companies: Building2Icon,
   users: UsersIcon,
+  audit: HistoryIcon,
 } satisfies Record<string, LucideIcon>;
 
 export function NavSection({ title, items }: { title: string; items: NavItem[] }) {

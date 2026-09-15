@@ -1,5 +1,8 @@
+import { rm } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
+import { resolveDataPath } from "@/lib/storage";
+import { closeBrowser } from "@/modules/documents/pdf";
 import type { Scope } from "@/lib/scope";
 import { money } from "@/lib/money";
 import * as payroll from "@/modules/payroll/service";
@@ -169,9 +172,12 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await closeBrowser();
   if (companyId) {
     await prisma.$executeRaw`UPDATE pay_periods SET status = 'COMPUTED' WHERE company_id = ${companyId}::uuid`;
     await prisma.company.delete({ where: { id: companyId } });
+    // the PDFs rendered for the throw-away company
+    await rm(resolveDataPath("payslips", companyId), { recursive: true, force: true });
   }
   await prisma.user.deleteMany({ where: { email: { startsWith: TAG.toLowerCase() } } });
   await prisma.$disconnect();

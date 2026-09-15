@@ -43,6 +43,7 @@ function buildNav(user: CurrentUser, company: CompanySummary | null) {
     ? [
         { href: "/app/companies", label: "Companies", icon: "companies" },
         { href: "/app/users", label: "Users", icon: "users" },
+        { href: "/app/audit", label: "Audit log", icon: "audit" },
       ]
     : [];
   return { companyItems, adminItems };

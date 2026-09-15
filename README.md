@@ -3,7 +3,7 @@
 Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 7** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing, leave with credits, 201 attachments, separation / final pay, company dashboard, government reports, 13th month, year-end annualization, email outbox, backups).
+Status: **Phase 8** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing, leave with credits, 201 attachments, separation / final pay, company dashboard, government reports, 13th month, year-end annualization, email outbox, backups, hardening and a production deployment). Deploying: [docs/deployment.md](docs/deployment.md).
 
 ## Run locally from a fresh clone
 
@@ -51,6 +51,8 @@ pnpm dev                         # http://localhost:8080
 | `pnpm db:seed`                           | Idempotent seed: first admin + 2026 national holidays     |
 | `pnpm db:reset`                          | Drop, re-migrate and re-seed the database                 |
 | `pnpm audit`                             | Dependency vulnerability audit                            |
+| `pnpm backup` / `pnpm restore …`         | `scripts/backup.sh` / `scripts/restore.sh` (see Phase 8)  |
+| `pnpm load-check`                        | 200-employee compute → approve → PDFs timing (needs db)   |
 
 ## Layout
 
@@ -282,6 +284,40 @@ docker/                  dev image + entrypoint
   fails the run. Restore commands are in the script header. Schedule it with cron / Task Scheduler on the host.
 - **Seed additions**: ANNUAL tax brackets (added to an existing table on re-seed), pay components
   `THIRTEENTH_MONTH`, `TAX_REFUND`, `WTAX_ADJ`.
+
+## Hardening and deployment (Phase 8)
+
+- **Login and sessions**: two in-memory throttles before any bcrypt work — per client IP
+  (`LOGIN_MAX_ATTEMPTS_PER_IP`) and per account (`LOGIN_MAX_ATTEMPTS_PER_ACCOUNT`) within `LOGIN_WINDOW_SECONDS` —
+  then the database lockout (`ACCOUNT_LOCK_AFTER_FAILURES` / `ACCOUNT_LOCK_MINUTES`, survives restarts). Sessions
+  have an **idle** timeout (`SESSION_IDLE_SECONDS`, the JWT cookie's lifetime, refreshed while active) and an
+  **absolute** lifetime (`SESSION_MAX_AGE_SECONDS`, from the `issuedAt` stamped at sign-in; checked in the proxy,
+  in the JWT callback and in `getCurrentUser`). A password change still revokes every earlier session.
+- **Password policy** (`src/lib/password.ts`): 12–128 characters, a letter and a digit, not containing the email
+  name, no character repeated 4+ times, no straight or keyboard runs of 5+ (`12345`, `abcde`, `qwert`), not on the
+  common list. Applied to every new password (create user, reset, change).
+- **Forced password change**: seeded admins, new users and admin resets set `mustChangePassword`; the proxy holds
+  such a user on `/app/account/password`, and `getScope()` refuses them a scope so a server action posted directly
+  is rejected too (only the change-password action uses `getAccountScope()`).
+- **Audit log viewer** (Administration → Audit log, ADMIN): filters by user, company, entity, action, entity id and
+  Manila date range; 50 per page; before/after JSON per row (redacted at write time). Append-only — there is no
+  delete path.
+- **`GET /api/health`** (no auth): database round-trip + a write probe in `DATA_DIR`; `200 {"status":"ok"}` or
+  `503 {"status":"degraded"}` with per-check `ok`/`ms`, the image version (`APP_VERSION`) and uptime — never
+  configuration or error details. Used by the Docker `HEALTHCHECK`.
+- **Production image** (`docker/Dockerfile`): multi-stage on the Playwright base (Chromium + libraries), `next build`
+  standalone output, a small `tools/` tree (Prisma CLI + tsx) for migrations and the seed, runtime as `pwuser`
+  (the entrypoint starts as root only to fix `/data` ownership on bind mounts, then `setpriv`s down). Entrypoint:
+  `prisma migrate deploy` → idempotent seed → `node server.js`; `SKIP_MIGRATE` / `SKIP_SEED` to opt out.
+- **`docker-compose.prod.yml`**: `db` (no published port) + `app` (bound to `APP_BIND:APP_PORT`, `/data` volume,
+  2 GB cap, 512 MB `/dev/shm`) + `jobs` sidecar. `HRMS_DATA_PATH` / `HRMS_PGDATA_PATH` switch the volumes to host
+  folders. `docker-compose.caddy.yml` adds Caddy with automatic HTTPS for a VPS.
+- **Restore** (`pnpm restore <db.sql.gz> <data.tgz>` → `scripts/restore.sh`): stops `app`/`jobs`, drops and
+  re-creates the database, loads the dump, replaces `/data`, restarts. Asks for the database name
+  (`RESTORE_CONFIRM=yes` to skip). Verified: a backup restored into a fresh production stack returns the stored
+  payslip PDFs byte-for-byte (SHA-256 identical).
+- **Load check** (`pnpm load-check`): a throw-away 200-employee company over one cutoff — compute ≈ 2 s,
+  approve ≈ 1 s, 200 payslip PDFs + batch ≈ 60 s on the dev PC (budget 2 min).
 
 ## Conventions worth knowing
 

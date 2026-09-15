@@ -56,9 +56,11 @@ const nextConfig: NextConfig = {
     "playwright-core",
     "nodemailer", // SMTP outbox (Phase 7)
   ],
-  // The OCR engine loads its WASM core and language model by path at runtime, so the
-  // standalone build has to carry those files explicitly.
+  // Files loaded by path at runtime, which static tracing misses, so the standalone build has to
+  // carry them explicitly: Playwright's browser registry (browsers.json, needed to launch Chromium
+  // for payslip PDFs) and the OCR engine's WASM core and language model.
   outputFileTracingIncludes: {
+    "/**": ["./node_modules/playwright-core/**", "./node_modules/playwright/**"],
     "/app/[companyId]/attendance/scan": [
       "./node_modules/tesseract.js/**",
       "./node_modules/tesseract.js-core/**",

@@ -31,10 +31,11 @@ export function dummyHash(): Promise<string> {
 export type PasswordPolicyResult = { ok: true } | { ok: false; reasons: string[] };
 
 /**
- * Password policy (Phase 0 hardening):
+ * Password policy (Phase 0, tightened in Phase 8):
  * - 12–128 characters
  * - at least one letter and one digit
  * - must not contain the user's email local part
+ * - no character repeated 4+ times in a row, no straight runs of 5+ ("12345", "abcde", "qwert")
  * - not on a small list of trivially guessable passwords
  */
 export function checkPasswordPolicy(password: string, email?: string): PasswordPolicyResult {
@@ -52,8 +53,29 @@ export function checkPasswordPolicy(password: string, email?: string): PasswordP
     }
   }
   const lowered = password.toLowerCase();
+  if (/(.)\1{3}/.test(lowered)) reasons.push("No character repeated 4 or more times in a row");
+  if (hasRun(lowered, 5)) reasons.push("No sequences such as 12345 or abcde");
   if (COMMON.some((c) => lowered.includes(c))) reasons.push("Too common or predictable");
   return reasons.length ? { ok: false, reasons } : { ok: true };
 }
 
 const COMMON = ["password", "123456789", "qwertyuiop", "letmein", "welcome1", "admin123"];
+const KEYBOARD_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+
+/** True when `s` contains `length` consecutive characters that ascend, descend, or walk a keyboard row. */
+function hasRun(s: string, length: number): boolean {
+  for (let i = 0; i + length <= s.length; i++) {
+    const w = s.slice(i, i + length);
+    let asc = true;
+    let desc = true;
+    for (let j = 1; j < w.length; j++) {
+      const d = w.charCodeAt(j) - w.charCodeAt(j - 1);
+      if (d !== 1) asc = false;
+      if (d !== -1) desc = false;
+    }
+    if (asc || desc) return true;
+    if (KEYBOARD_ROWS.some((row) => row.includes(w) || row.includes([...w].reverse().join(""))))
+      return true;
+  }
+  return false;
+}
