@@ -86,6 +86,8 @@ export type LeaveRequestInput = z.infer<typeof leaveRequestSchema>;
 
 export const decisionSchema = z.object({
   note: z.preprocess(blankToNull, z.string().trim().max(300).nullable()),
+  /** Approve only: convert a "with pay" request to leave without pay (no credits taken). */
+  withoutPay: checkbox.optional(),
 });
 
 // ---------------------------------------------------------------------------

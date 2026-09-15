@@ -379,12 +379,14 @@ export async function createRequest(scope: Scope, companyId: string, input: Leav
  * Approve: re-plan the days (attendance may have changed since encoding), refuse dates inside
  * an approved pay period, take credits for leave with pay, and write one DTR row per working
  * day (LEAVE_WITH_PAY / LEAVE_WITHOUT_PAY, source LEAVE) — all in one transaction.
+ * `opts.withoutPay` approves a "with pay" request as leave without pay instead (no credits).
  */
 export async function approveRequest(
   scope: Scope,
   companyId: string,
   id: string,
   note: string | null,
+  opts: { withoutPay?: boolean } = {},
 ) {
   assertPermission(scope, "leave.approve");
   assertCompanyAccess(scope, companyId);
@@ -403,17 +405,19 @@ export async function approveRequest(
   if (plan.count === 0)
     throw new AppError("There are no scheduled working days left in the range.");
 
+  const withPay = request.withPay && !opts.withoutPay;
+
   return repo.transaction(scope, async (tx) => {
     const type = await repo.getType(tx, companyId, request.leaveTypeId);
     if (!type) throw new AppError("Leave type not found.");
     const days = new Decimal(plan.count);
-    if (request.withPay) {
+    if (withPay) {
       const year = Number(start.slice(0, 4));
       const balance = await ensureBalance(tx, scope, companyId, request.employeeId, type, year);
       const remaining = d2(balance.credits).minus(d2(balance.used));
       if (remaining.lt(days))
         throw new AppError(
-          `Not enough ${type.code} credits for ${year}: ${fmtDays(remaining)} left, ${fmtDays(days)} needed. Adjust the credits or approve it as leave without pay.`,
+          `Not enough ${type.code} credits for ${year}: ${fmtDays(remaining)} left, ${fmtDays(days)} needed. Adjust the credits, or tick "Approve as leave without pay".`,
         );
       const after = await repo.updateBalance(tx, companyId, balance.id, {
         used: d2(balance.used).plus(days).toFixed(2),
@@ -433,13 +437,14 @@ export async function approveRequest(
       request.employeeId,
       plan.days.map((day) => ({
         date: day.date,
-        dayType: request.withPay ? "LEAVE_WITH_PAY" : "LEAVE_WITHOUT_PAY",
+        dayType: withPay ? "LEAVE_WITH_PAY" : "LEAVE_WITHOUT_PAY",
         remarks: `${type.name}${request.reason ? ` — ${request.reason}` : ""}`.slice(0, 200),
       })),
     );
     const after = await repo.updateRequest(tx, companyId, id, {
       status: "APPROVED",
       days: days.toFixed(2),
+      withPay,
       decidedById: scope.userId || null,
       decidedAt: new Date(),
       decisionNote: note,
@@ -448,8 +453,14 @@ export async function approveRequest(
       "LeaveRequest",
       id,
       "UPDATE",
-      { status: request.status },
-      { status: after.status, days: plan.count, dates: plan.days.map((x) => x.date), note },
+      { status: request.status, withPay: request.withPay },
+      {
+        status: after.status,
+        withPay,
+        days: plan.count,
+        dates: plan.days.map((x) => x.date),
+        note,
+      },
       { scope, companyId, tx },
     );
     return after;

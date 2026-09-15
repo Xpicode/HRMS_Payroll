@@ -114,6 +114,7 @@ export function RequestsTable({
                     canApprove={canApprove}
                     canRequest={canRequest}
                     returnTo={returnTo}
+                    withPay={r.withPay}
                     summary={`${r.leaveType.code} ${start === end ? start : `${start} to ${end}`} for ${r.employee.lastName}, ${r.employee.firstName}`}
                   />
                 </TableCell>

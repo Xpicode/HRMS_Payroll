@@ -292,7 +292,27 @@ describe("leave without pay → next payroll run", () => {
     await expect(leave.approveRequest(officer, companyId, big.id, null)).rejects.toThrow(
       /Not enough VL credits/,
     );
+    // ... unless the approver converts it to leave without pay: no credits taken, LWOP rows written
+    const converted = await leave.approveRequest(officer, companyId, big.id, "no credits left", {
+      withoutPay: true,
+    });
+    expect(converted.status).toBe("APPROVED");
+    expect(converted.withPay).toBe(false);
+    const vlAfter = (await leave.employeeBalances(officer, companyId, dailyId, 2026)).find(
+      (b) => b.leaveType.code === "VL",
+    )!;
+    expect(vlAfter.remaining).toBe("4");
+    const rows = await prisma.dailyTimeRecord.findMany({
+      where: { employeeId: dailyId, date: { gte: d("2026-09-21"), lte: d("2026-09-26") } },
+    });
+    expect(rows.length).toBe(6);
+    expect(rows.every((r) => r.dayType === "LEAVE_WITHOUT_PAY")).toBe(true);
+    // cancelling the converted leave gives nothing back (nothing was taken)
     await leave.cancelRequest(officer, companyId, big.id);
+    const vlFinal = (await leave.employeeBalances(officer, companyId, dailyId, 2026)).find(
+      (b) => b.leaveType.code === "VL",
+    )!;
+    expect(vlFinal.remaining).toBe("4");
   });
 
   it("cancelling an approved leave removes its rows and returns the credits", async () => {

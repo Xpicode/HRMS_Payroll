@@ -15,6 +15,8 @@ type Props = {
   canRequest: boolean;
   returnTo: string | null;
   summary: string;
+  /** The request asks for paid leave; the approver may convert it to leave without pay. */
+  withPay: boolean;
 };
 
 /** Approve / Reject (with an optional note) and Cancel, inline in the requests table. */
@@ -26,6 +28,7 @@ export function RequestActions({
   canRequest,
   returnTo,
   summary,
+  withPay,
 }: Props) {
   const [open, setOpen] = useState<"approve" | "reject" | null>(null);
   const [approveState, approve] = useActionState(
@@ -50,28 +53,36 @@ export function RequestActions({
       {open ? (
         <form
           action={open === "approve" ? approve : reject}
-          className="flex items-center gap-1"
+          className="flex flex-col items-end gap-1"
           onSubmit={(e) => {
             if (open === "approve" && !window.confirm(`Approve ${summary}?`)) e.preventDefault();
           }}
         >
-          <Input
-            name="note"
-            placeholder={open === "approve" ? "Note (optional)" : "Reason (optional)"}
-            className="h-7 w-44 text-xs"
-            maxLength={300}
-            autoFocus
-          />
-          <SubmitButton
-            size="sm"
-            variant={open === "approve" ? "default" : "destructive"}
-            pendingText="…"
-          >
-            {open === "approve" ? "Confirm" : "Reject"}
-          </SubmitButton>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(null)}>
-            Back
-          </Button>
+          <div className="flex items-center gap-1">
+            <Input
+              name="note"
+              placeholder={open === "approve" ? "Note (optional)" : "Reason (optional)"}
+              className="h-7 w-44 text-xs"
+              maxLength={300}
+              autoFocus
+            />
+            <SubmitButton
+              size="sm"
+              variant={open === "approve" ? "default" : "destructive"}
+              pendingText="…"
+            >
+              {open === "approve" ? "Confirm" : "Reject"}
+            </SubmitButton>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(null)}>
+              Back
+            </Button>
+          </div>
+          {open === "approve" && withPay ? (
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <input type="checkbox" name="withoutPay" className="size-3.5 accent-primary" />
+              Approve as leave without pay (no credits used)
+            </label>
+          ) : null}
         </form>
       ) : (
         <div className="flex items-center gap-1">

@@ -131,7 +131,9 @@ export async function decideRequestAction(
   try {
     const scope = await getScope();
     if (op === "approve")
-      await service.approveRequest(scope, companyId, requestId, parsed.data.note);
+      await service.approveRequest(scope, companyId, requestId, parsed.data.note, {
+        withoutPay: parsed.data.withoutPay === true,
+      });
     else if (op === "reject")
       await service.rejectRequest(scope, companyId, requestId, parsed.data.note);
     else await service.cancelRequest(scope, companyId, requestId);
