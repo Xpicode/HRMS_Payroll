@@ -74,7 +74,7 @@ export default async function CompanyDashboard({
         }
       />
 
-      <div className="stagger mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="stagger mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Stat
           label="Headcount"
           value={String(counts.ACTIVE + counts.ON_LEAVE)}
@@ -113,7 +113,7 @@ export default async function CompanyDashboard({
         />
       </div>
 
-      <div className="stagger grid gap-4 [--stagger-step:35ms] md:grid-cols-3">
+      <div className="stagger grid gap-3 [--stagger-step:35ms] sm:gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Payslip header</CardTitle>

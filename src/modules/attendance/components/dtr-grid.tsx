@@ -226,8 +226,8 @@ export function DtrGrid({
       <input type="hidden" name="rows" value={payload} />
       <FormAlert state={state} />
 
-      <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full min-w-[980px] text-sm">
+      <div className="scroll-shadow overflow-x-auto rounded-lg border bg-card">
+        <table className="w-full min-w-[980px] text-sm max-md:[&_tr>*:first-child]:sticky max-md:[&_tr>*:first-child]:left-0 max-md:[&_tr>*:first-child]:z-10 max-md:[&_tr>*:first-child]:bg-card max-md:[&_tr>*:first-child]:shadow-[inset_-1px_0_0_var(--border)]">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr className="[&>th]:px-2 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
               <th className="w-36">Date</th>
@@ -466,12 +466,12 @@ export function DtrGrid({
       </div>
 
       {canEdit ? (
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
             Time in/out derive hours, late and undertime. OT and night differential are suggested
             from the punches and can be edited. Enter moves down a column; Tab moves across.
           </p>
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setRows(days.map(rowFrom))}>
               Reset
             </Button>

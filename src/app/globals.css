@@ -341,3 +341,45 @@
     }
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Any device. Wide tables scroll inside their card with edge shadows, section tabs
+   scroll instead of clipping, and on touch screens every control grows to a
+   comfortable 40px target. The sidebar becomes a bottom tab bar under `md`.
+   --------------------------------------------------------------------------- */
+@layer components {
+  /* Shadows that appear only on the side that has more content (scroll-attached gradients). */
+  .scroll-shadow {
+    background:
+      linear-gradient(to right, var(--card) 40%, transparent) left / 2rem 100% no-repeat local,
+      linear-gradient(to left, var(--card) 40%, transparent) right / 2rem 100% no-repeat local,
+      linear-gradient(to right, oklch(0.2 0.02 260 / 0.14), transparent) left / 0.9rem 100%
+        no-repeat scroll,
+      linear-gradient(to left, oklch(0.2 0.02 260 / 0.14), transparent) right / 0.9rem 100%
+        no-repeat scroll;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  @media (pointer: coarse) {
+    [data-slot="input"],
+    [data-slot="button"]:not([data-size^="icon"]),
+    select,
+    textarea {
+      min-height: 2.5rem;
+    }
+    [data-slot="input"],
+    select {
+      font-size: 1rem; /* stops iOS zooming into fields */
+    }
+    [data-slot="table-row"] > td {
+      padding-block: 0.75rem;
+    }
+  }
+}

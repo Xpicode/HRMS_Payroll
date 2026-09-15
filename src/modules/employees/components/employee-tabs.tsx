@@ -24,14 +24,17 @@ export function EmployeeTabs({
     { key: "documents", label: "Documents", href: `${base}/documents` },
   ];
   return (
-    <nav className="mb-6 flex gap-1 border-b" aria-label="Employee sections">
+    <nav
+      className="scrollbar-none -mx-4 mb-6 flex gap-1 overflow-x-auto border-b px-4 whitespace-nowrap sm:mx-0 sm:px-0"
+      aria-label="Employee sections"
+    >
       {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           aria-current={t.key === active ? "page" : undefined}
           className={cn(
-            "-mb-px border-b-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground",
+            "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground",
             t.key === active ? "border-primary font-medium text-foreground" : "border-transparent",
           )}
         >

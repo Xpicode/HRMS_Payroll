@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -9,6 +9,16 @@ export const metadata: Metadata = {
   title: { default: "HRMS Payroll", template: "%s · HRMS Payroll" },
   description: "Multi-company HRMS and Philippine payroll",
   robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafbfd" },
+    { media: "(prefers-color-scheme: dark)", color: "#141821" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

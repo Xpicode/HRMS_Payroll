@@ -3,12 +3,26 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/**
+ * Tables scroll sideways inside their card on narrow screens. Below `md` the first column
+ * (always the identifying one: name, date, code) stays put while the rest scrolls, and the
+ * container shows soft edge shadows so it is obvious there is more to the side.
+ */
+function Table({
+  className,
+  stickyFirstColumn = true,
+  ...props
+}: React.ComponentProps<"table"> & { stickyFirstColumn?: boolean }) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div data-slot="table-container" className="scroll-shadow relative w-full overflow-x-auto">
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
+        className={cn(
+          "w-full caption-bottom text-sm",
+          stickyFirstColumn &&
+            "max-md:[&_tr>*:first-child]:sticky max-md:[&_tr>*:first-child]:left-0 max-md:[&_tr>*:first-child]:z-10 max-md:[&_tr>*:first-child]:bg-card max-md:[&_tr>*:first-child]:shadow-[inset_-1px_0_0_var(--border)] max-md:[&_thead_tr>*:first-child]:bg-card",
+          className,
+        )}
         {...props}
       />
     </div>

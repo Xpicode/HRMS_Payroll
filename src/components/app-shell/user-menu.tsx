@@ -14,10 +14,11 @@ import {
 import { logoutAction } from "@/modules/auth/actions";
 import { ROLE_LABELS } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/enums";
+import { cn } from "@/lib/utils";
 
-type Props = { user: { name: string; email: string; role: Role } };
+type Props = { user: { name: string; email: string; role: Role }; rail?: boolean };
 
-export function UserMenu({ user }: Props) {
+export function UserMenu({ user, rail }: Props) {
   const initials = user.name
     .split(/\s+/)
     .slice(0, 2)
@@ -27,13 +28,17 @@ export function UserMenu({ user }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="flex w-full items-center gap-2.5 rounded-lg p-2 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-lg p-2 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+          rail && "md:max-lg:justify-center md:max-lg:p-1.5",
+        )}
         aria-label="Account menu"
+        title={rail ? user.name : undefined}
       >
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-foreground">
           {initials || "?"}
         </span>
-        <span className="min-w-0 flex-1">
+        <span className={cn("min-w-0 flex-1", rail && "md:max-lg:sr-only")}>
           <span className="block truncate text-sm font-medium text-sidebar-foreground">
             {user.name}
           </span>
@@ -41,7 +46,9 @@ export function UserMenu({ user }: Props) {
             {ROLE_LABELS[user.role]}
           </span>
         </span>
-        <MoreVerticalIcon className="size-4 shrink-0 text-sidebar-muted" />
+        <MoreVerticalIcon
+          className={cn("size-4 shrink-0 text-sidebar-muted", rail && "md:max-lg:hidden")}
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-(--anchor-width) min-w-56">
         <DropdownMenuGroup>

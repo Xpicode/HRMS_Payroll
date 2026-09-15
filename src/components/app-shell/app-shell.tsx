@@ -6,8 +6,10 @@ import { CompanySwitcher } from "./company-switcher";
 import { UserMenu } from "./user-menu";
 import { NavSection, type NavItem } from "./nav";
 import { PageTransition } from "./page-transition";
+import { MobileTabBar } from "./mobile-tab-bar";
 import type { CompanySummary, CurrentUser } from "@/lib/session";
 import { roleCan } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 type Props = {
   user: CurrentUser;
@@ -50,23 +52,53 @@ function buildNav(user: CurrentUser, company: CompanySummary | null) {
   return { companyItems, adminItems };
 }
 
-function SidebarBody({ user, currentCompany }: Omit<Props, "children">) {
+/**
+ * `rail`: on tablets (md up to lg) the desktop sidebar shrinks to an icon rail with the labels
+ * hidden; the same body in the phone sheet is always full width.
+ */
+function SidebarBody({ user, currentCompany, rail }: Omit<Props, "children"> & { rail?: boolean }) {
   const { companyItems, adminItems } = buildNav(user, currentCompany);
   return (
-    <div className="flex h-full flex-col gap-5 p-3">
-      <Link href="/app" className="group flex items-center gap-2 px-1 pt-1">
+    <div
+      className={cn(
+        "flex h-full flex-col gap-5 p-3",
+        rail && "md:max-lg:items-stretch md:max-lg:p-2",
+      )}
+    >
+      <Link
+        href="/app"
+        className={cn(
+          "group flex items-center gap-2 px-1 pt-1",
+          rail && "md:max-lg:justify-center md:max-lg:px-0",
+        )}
+      >
         <span className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary font-heading text-sm font-bold text-sidebar-primary-foreground shadow-[0_0_0_0_var(--sidebar-primary)] transition-[transform,box-shadow] duration-300 group-hover:rotate-[-6deg] group-hover:shadow-[0_0_24px_-6px_var(--sidebar-primary)]">
           U
         </span>
-        <span className="text-sm font-semibold text-sidebar-foreground">HRMS Payroll</span>
+        <span
+          className={cn(
+            "text-sm font-semibold text-sidebar-foreground",
+            rail && "md:max-lg:sr-only",
+          )}
+        >
+          HRMS Payroll
+        </span>
       </Link>
-      <CompanySwitcher companies={user.companies} currentCompanyId={currentCompany?.id ?? null} />
+      <CompanySwitcher
+        companies={user.companies}
+        currentCompanyId={currentCompany?.id ?? null}
+        rail={rail}
+      />
       <nav className="flex flex-1 flex-col gap-5">
-        <NavSection title={currentCompany ? currentCompany.code : "Company"} items={companyItems} />
-        <NavSection title="Administration" items={adminItems} />
+        <NavSection
+          title={currentCompany ? currentCompany.code : "Company"}
+          items={companyItems}
+          rail={rail}
+        />
+        <NavSection title="Administration" items={adminItems} rail={rail} />
       </nav>
       <div className="border-t border-sidebar-border pt-2">
-        <UserMenu user={user} />
+        <UserMenu user={user} rail={rail} />
       </div>
     </div>
   );
@@ -75,9 +107,9 @@ function SidebarBody({ user, currentCompany }: Omit<Props, "children">) {
 export function AppShell({ user, currentCompany, children }: Props) {
   return (
     <div className="flex min-h-svh w-full">
-      <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar bg-[radial-gradient(40rem_24rem_at_0%_0%,oklch(0.36_0.09_262/0.55),transparent_70%)] md:block">
+      <aside className="hidden w-[4.25rem] shrink-0 border-r border-sidebar-border bg-sidebar bg-[radial-gradient(40rem_24rem_at_0%_0%,oklch(0.36_0.09_262/0.55),transparent_70%)] transition-[width] duration-300 md:block lg:w-64">
         <div className="sticky top-0 h-svh">
-          <SidebarBody user={user} currentCompany={currentCompany} />
+          <SidebarBody user={user} currentCompany={currentCompany} rail />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
@@ -99,11 +131,16 @@ export function AppShell({ user, currentCompany, children }: Props) {
           </Sheet>
           <span className="text-sm font-semibold">{currentCompany?.code ?? "HRMS Payroll"}</span>
         </header>
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="flex-1 px-4 pt-5 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 md:py-6 lg:px-8">
           <div className="mx-auto w-full max-w-6xl">
             <PageTransition>{children}</PageTransition>
           </div>
         </main>
+        {currentCompany ? (
+          <MobileTabBar user={user} company={currentCompany}>
+            <SidebarBody user={user} currentCompany={currentCompany} />
+          </MobileTabBar>
+        ) : null}
       </div>
     </div>
   );
