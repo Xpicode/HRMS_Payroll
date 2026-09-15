@@ -98,6 +98,9 @@ export default async function EmployeeDetailsPage({
         ) : null}
       </div>
       <EmployeeForm
+        // Separation / reinstatement above changes status and date under the form; remount it
+        // so the uncontrolled inputs pick up the new defaults instead of mutating them.
+        key={`${employee.status}:${separationDate ?? ""}:${employee.updatedAt.toISOString()}`}
         mode="edit"
         companyId={companyId}
         departments={departments}
