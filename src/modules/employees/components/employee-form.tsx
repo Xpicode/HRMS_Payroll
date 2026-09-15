@@ -260,12 +260,20 @@ export function EmployeeForm(props: Props) {
                 >
                   <Input id="email" name="email" type="email" defaultValue={d("email", e?.email)} />
                 </Field>
-                <Field label="Mobile" name="mobile" error={errors?.mobile}>
+                <Field
+                  label="Mobile"
+                  name="mobile"
+                  error={errors?.mobile}
+                  hint="12 digits: 63 + the number, e.g. 639171234567. 0917… is converted."
+                >
                   <Input
                     id="mobile"
                     name="mobile"
                     defaultValue={d("mobile", e?.mobile)}
                     inputMode="tel"
+                    placeholder="639171234567"
+                    maxLength={20}
+                    className="font-mono"
                   />
                 </Field>
                 <Field

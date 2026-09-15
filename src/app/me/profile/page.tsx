@@ -4,6 +4,7 @@ import { KeyRoundIcon } from "lucide-react";
 import { getScope, requireEmployee } from "@/lib/session";
 import { formatDateOnly } from "@/lib/dates";
 import { portalContext } from "@/modules/self-service/service";
+import { formatMobile } from "@/modules/employees/schema";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,7 +82,7 @@ export default async function MyProfilePage() {
           <CardContent>
             <dl className="divide-y divide-border/60">
               <Row label="Email on file" value={e.email ?? "—"} />
-              <Row label="Mobile" value={e.mobile ?? "—"} />
+              <Row label="Mobile" value={e.mobile ? formatMobile(e.mobile) : "—"} />
               <Row label="Address" value={e.address ?? "—"} />
               <Row label="Birth date" value={e.birthDate ? formatDateOnly(e.birthDate) : "—"} />
             </dl>

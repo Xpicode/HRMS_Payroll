@@ -3,7 +3,9 @@ import {
   csvRowToInputs,
   employeeSchema,
   formatGovId,
+  formatMobile,
   governmentIdWarnings,
+  normalizeMobile,
   paySettingSchema,
   recurringItemSchema,
 } from "@/modules/employees/schema";
@@ -29,6 +31,22 @@ describe("employeeSchema", () => {
     expect(r.philhealthNo).toBe("123456789012");
     expect(r.pagibigMid).toBe("121234567890");
     expect(r.tin).toBe("123456789000");
+  });
+  it("stores mobile numbers as 12 digits (63 + number) and refuses other shapes", () => {
+    expect(normalizeMobile("0917 123 4567")).toBe("639171234567");
+    expect(normalizeMobile("+63 917-123-4567")).toBe("639171234567");
+    expect(normalizeMobile("639171234567")).toBe("639171234567");
+    expect(normalizeMobile("9171234567")).toBe("639171234567");
+    expect(normalizeMobile("917123456")).toBeNull(); // too short
+    expect(normalizeMobile("6391712345678")).toBeNull(); // 13 digits
+    expect(normalizeMobile("0817123456")).toBeNull(); // landline shape
+    expect(employeeSchema.parse({ ...base, mobile: "0917-123-4567" }).mobile).toBe("639171234567");
+    expect(employeeSchema.parse({ ...base, mobile: "" }).mobile).toBeNull();
+    const bad = employeeSchema.safeParse({ ...base, mobile: "12345" });
+    expect(bad.success).toBe(false);
+    if (!bad.success) expect(bad.error.issues[0]?.path).toEqual(["mobile"]);
+    expect(formatMobile("639171234567")).toBe("+63 917 123 4567");
+    expect(formatMobile("legacy 123")).toBe("legacy 123");
   });
   it("requires a separation date when separated and orders dates", () => {
     expect(employeeSchema.safeParse({ ...base, status: "SEPARATED" }).success).toBe(false);

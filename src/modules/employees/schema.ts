@@ -36,6 +36,26 @@ const optionalMoney = z.preprocess(blankToNull, moneyText.nullable());
 // Employee (201 record)
 // ---------------------------------------------------------------------------
 
+/**
+ * Philippine mobile numbers are stored as 12 digits: country code 63 + the 10-digit
+ * subscriber number (639171234567). Accepts the local 0917… form, +63 / 63 forms and any
+ * spaces, dashes or parentheses; returns null when it is not a PH mobile.
+ */
+export function normalizeMobile(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (/^09\d{9}$/.test(digits)) return `63${digits.slice(1)}`;
+  if (/^639\d{9}$/.test(digits)) return digits;
+  if (/^9\d{9}$/.test(digits)) return `63${digits}`;
+  return null;
+}
+
+/** 639171234567 → +63 917 123 4567 (other stored shapes are shown as-is). */
+export function formatMobile(stored: string | null): string {
+  if (!stored) return "";
+  const m = /^63(9\d{2})(\d{3})(\d{4})$/.exec(stored);
+  return m ? `+63 ${m[1]} ${m[2]} ${m[3]}` : stored;
+}
+
 export const employeeSchema = z
   .object({
     /** Blank = allocate the next number from the company series. */
@@ -63,8 +83,17 @@ export const employeeSchema = z
       blankToNull,
       z
         .string()
-        .trim()
-        .regex(/^[0-9+() -]{7,20}$/, "Enter a phone number")
+        .transform((s, ctx) => {
+          const n = normalizeMobile(s);
+          if (!n) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Enter a 12-digit mobile number, e.g. 639171234567 (0917… is accepted)",
+            });
+            return z.NEVER;
+          }
+          return n;
+        })
         .nullable(),
     ),
     address: optionalText(300),
@@ -277,7 +306,7 @@ export const CSV_COLUMNS = [
   { key: "position", required: false, hint: "" },
   { key: "department", required: false, hint: "" },
   { key: "email", required: false, hint: "" },
-  { key: "mobile", required: false, hint: "" },
+  { key: "mobile", required: false, hint: "12 digits, 63 + number (0917… accepted)" },
   { key: "address", required: false, hint: "" },
   { key: "sss_no", required: false, hint: "10 digits" },
   { key: "philhealth_no", required: false, hint: "12 digits" },
