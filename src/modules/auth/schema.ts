@@ -59,10 +59,8 @@ export const updateUserSchema = z.object({
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
-/** Self-service login for an employee (Phase 9): the sign-in email and a temporary password. */
-export const employeeLoginSchema = z
-  .object({ email: emailSchema, password: newPassword })
-  .superRefine((d, ctx) => applyPolicy(ctx, d));
+/** Self-service login for an employee (Phase 9): only the sign-in email; the temporary password is fixed. */
+export const employeeLoginSchema = z.object({ email: emailSchema });
 export type EmployeeLoginInput = z.infer<typeof employeeLoginSchema>;
 
 export const resetPasswordSchema = z

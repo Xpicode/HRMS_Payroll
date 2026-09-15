@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { resolveDataPath } from "@/lib/storage";
+import { EMPLOYEE_TEMP_PASSWORD, verifyPassword } from "@/lib/password";
 import type { Scope } from "@/lib/scope";
 import * as auth from "@/modules/auth/service";
 import * as documents from "@/modules/documents/service";
@@ -146,7 +147,6 @@ describe("portal access is created from the employee record", () => {
     expect(await auth.getEmployeeLogin(officer, companyId, aliceId)).toBeNull();
     const login = await auth.createEmployeeLogin(officer, companyId, aliceId, {
       email: `${TAG.toLowerCase()}-alice@example.com`,
-      password: "Alice-Portal-2026",
     });
     expect(login.mustChangePassword).toBe(true);
     expect(login.isActive).toBe(true);
@@ -154,6 +154,7 @@ describe("portal access is created from the employee record", () => {
       where: { email: login.email },
       include: { companies: true },
     });
+    expect(await verifyPassword(EMPLOYEE_TEMP_PASSWORD, user.passwordHash)).toBe(true);
     expect(user.role).toBe("EMPLOYEE");
     expect(user.employeeId).toBe(aliceId);
     expect(user.companies.map((c) => c.companyId)).toEqual([companyId]);
@@ -178,13 +179,11 @@ describe("portal access is created from the employee record", () => {
     await expect(
       auth.createEmployeeLogin(officer, companyId, aliceId, {
         email: `${TAG.toLowerCase()}-alice2@example.com`,
-        password: "Alice-Portal-2026",
       }),
     ).rejects.toThrow(/already has a login/);
     await expect(
       auth.createEmployeeLogin(officer, companyId, bobId, {
         email: `${TAG.toLowerCase()}-alice@example.com`,
-        password: "Bob-Portal-2026x",
       }),
     ).rejects.toThrow(/already in use/);
     const stranger: Scope = {
@@ -196,7 +195,6 @@ describe("portal access is created from the employee record", () => {
     await expect(
       auth.createEmployeeLogin(stranger, companyId, bobId, {
         email: `${TAG.toLowerCase()}-bob@example.com`,
-        password: "Bob-Portal-2026x",
       }),
     ).rejects.toThrow(FORBIDDEN);
     // an encoder may not manage portal access
@@ -362,7 +360,7 @@ describe("creating an employee with portal access in one step", () => {
       companyId,
       { ...base, employeeNo: `${TAG}-0003`, email: `${TAG.toLowerCase()}-carla@example.com` },
       { confirmWarnings: true },
-      { email: null, password: "Carla-Portal-2026" },
+      { email: null },
     );
     const login = await auth.getEmployeeLogin(officer, companyId, row.id);
     expect(login?.email).toBe(`${TAG.toLowerCase()}-carla@example.com`);
@@ -377,7 +375,7 @@ describe("creating an employee with portal access in one step", () => {
         companyId,
         { ...base, employeeNo: `${TAG}-0004`, firstName: "Dup", email: null },
         { confirmWarnings: true },
-        { email: `${TAG.toLowerCase()}-carla@example.com`, password: "Dup-Portal-2026x" },
+        { email: `${TAG.toLowerCase()}-carla@example.com` },
       ),
     ).rejects.toMatchObject({ fieldErrors: { portalEmail: ["Already in use"] } });
     await expect(
@@ -386,7 +384,7 @@ describe("creating an employee with portal access in one step", () => {
         companyId,
         { ...base, employeeNo: `${TAG}-0005`, firstName: "NoMail", email: null },
         { confirmWarnings: true },
-        { email: null, password: "NoMail-Portal-2026" },
+        { email: null },
       ),
     ).rejects.toThrow(/sign-in email/);
     const encoder: Scope = {
@@ -406,7 +404,7 @@ describe("creating an employee with portal access in one step", () => {
           email: `${TAG.toLowerCase()}-enc@example.com`,
         },
         { confirmWarnings: true },
-        { email: null, password: "Enc-Portal-2026xx" },
+        { email: null },
       ),
     ).rejects.toThrow(FORBIDDEN);
     expect(await prisma.employee.count({ where: { companyId } })).toBe(before);
@@ -415,9 +413,7 @@ describe("creating an employee with portal access in one step", () => {
 
 describe("lifecycle of the login", () => {
   it("reset and disable/enable are audited and take effect", async () => {
-    const reset = await auth.resetEmployeeLogin(officer, companyId, aliceId, {
-      password: "Alice-Portal-2027",
-    });
+    const reset = await auth.resetEmployeeLogin(officer, companyId, aliceId);
     expect(reset.mustChangePassword).toBe(true);
     const off = await auth.setEmployeeLoginActive(officer, companyId, aliceId, false);
     expect(off.isActive).toBe(false);
@@ -448,7 +444,6 @@ describe("lifecycle of the login", () => {
     await expect(
       auth.createEmployeeLogin(officer, companyId, aliceId, {
         email: `${TAG.toLowerCase()}-alice3@example.com`,
-        password: "Alice-Portal-2028",
       }),
     ).rejects.toThrow(/separated employee/);
   });

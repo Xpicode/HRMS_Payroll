@@ -59,9 +59,7 @@ export async function createEmployeeAction(
     };
     return withValues(fail("Please check the form.", errors), formData);
   }
-  const login = portal.data.createLogin
-    ? { email: portal.data.portalEmail, password: portal.data.portalPassword! }
-    : null;
+  const login = portal.data.createLogin ? { email: portal.data.portalEmail } : null;
   let id: string;
   try {
     const scope = await getScope();

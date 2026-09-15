@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { EMPLOYEE_TEMP_PASSWORD } from "@/lib/password";
 import { getLimiter } from "@/lib/rate-limit";
 import { clientIp, isUuid, safeRelativePath } from "@/lib/request";
 import { getAccountScope, getScope } from "@/lib/session";
@@ -169,19 +170,18 @@ export async function resetEmployeeLoginAction(
   companyId: string,
   employeeId: string,
   _prev: ActionResult,
-  formData: FormData,
 ): Promise<ActionResult> {
   if (!isUuid(companyId) || !isUuid(employeeId)) return fail("Invalid employee.");
-  const parsed = resetPasswordSchema.safeParse(formToObject(formData));
-  if (!parsed.success) return invalid(parsed.error);
   try {
     const scope = await getScope();
-    await service.resetEmployeeLogin(scope, companyId, employeeId, parsed.data);
+    await service.resetEmployeeLogin(scope, companyId, employeeId);
   } catch (e) {
     return handleError(e);
   }
   revalidatePath(employeePath(companyId, employeeId));
-  return success("Temporary password set. The employee must change it at next sign-in.");
+  return success(
+    `Password reset to the temporary password ${EMPLOYEE_TEMP_PASSWORD}. The employee must change it at next sign-in.`,
+  );
 }
 
 export async function setEmployeeLoginActiveAction(

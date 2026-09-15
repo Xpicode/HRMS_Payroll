@@ -13,6 +13,7 @@ import {
   pathAllowedFor,
   postLoginPath,
 } from "@/lib/routes";
+import { checkPasswordPolicy, EMPLOYEE_TEMP_PASSWORD } from "@/lib/password";
 import { employeeLoginSchema, staffRoleSchema } from "@/modules/auth/schema";
 import { PORTAL_SECTIONS, selfLeaveRequestSchema } from "@/modules/self-service/schema";
 
@@ -91,16 +92,15 @@ describe("portal routing", () => {
 });
 
 describe("self-service schemas", () => {
-  it("employee login needs a valid email and a policy-compliant password", () => {
-    expect(
-      employeeLoginSchema.safeParse({ email: "Juan@Example.com", password: "Correct-Horse-42x" }),
-    ).toMatchObject({ success: true, data: { email: "juan@example.com" } });
-    expect(
-      employeeLoginSchema.safeParse({ email: "nope", password: "Correct-Horse-42x" }).success,
-    ).toBe(false);
-    expect(employeeLoginSchema.safeParse({ email: "a@b.co", password: "short1" }).success).toBe(
-      false,
-    );
+  it("employee login needs only a valid email (the temporary password is fixed)", () => {
+    expect(employeeLoginSchema.safeParse({ email: "Juan@Example.com" })).toMatchObject({
+      success: true,
+      data: { email: "juan@example.com" },
+    });
+    expect(employeeLoginSchema.safeParse({ email: "nope" }).success).toBe(false);
+    expect(EMPLOYEE_TEMP_PASSWORD).toBe("123456789");
+    // the temporary value is deliberately outside the policy, so it can never be kept
+    expect(checkPasswordPolicy(EMPLOYEE_TEMP_PASSWORD).ok).toBe(false);
   });
 
   it("self leave request has no employee field and checks the range", () => {

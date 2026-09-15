@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { checkPasswordPolicy, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/password";
 import {
   EmployeeStatus,
   PayFrequency,
@@ -102,41 +101,20 @@ export type EmployeeInput = z.infer<typeof employeeSchema>;
 
 /**
  * Optional "Portal access" block of the New employee form (Phase 9). When `createLogin` is on,
- * the sign-in email falls back to the employee's email, and the password follows the policy.
+ * the sign-in email falls back to the employee's email; the temporary password is fixed
+ * (EMPLOYEE_TEMP_PASSWORD).
  */
-export const employeePortalSchema = z
-  .object({
-    createLogin: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()),
-    portalEmail: z.preprocess(
-      blankToNull,
-      z
-        .email("Enter a valid email")
-        .max(254)
-        .transform((s) => s.trim().toLowerCase())
-        .nullable(),
-    ),
-    portalPassword: z.preprocess(blankToNull, z.string().max(PASSWORD_MAX_LENGTH).nullable()),
-  })
-  .superRefine((d, ctx) => {
-    if (!d.createLogin) return;
-    if (!d.portalPassword)
-      ctx.addIssue({
-        code: "custom",
-        path: ["portalPassword"],
-        message: "Enter a temporary password",
-      });
-    else {
-      if (d.portalPassword.length < PASSWORD_MIN_LENGTH)
-        ctx.addIssue({
-          code: "custom",
-          path: ["portalPassword"],
-          message: `At least ${PASSWORD_MIN_LENGTH} characters`,
-        });
-      const res = checkPasswordPolicy(d.portalPassword, d.portalEmail ?? undefined);
-      if (!res.ok)
-        ctx.addIssue({ code: "custom", path: ["portalPassword"], message: res.reasons.join(". ") });
-    }
-  });
+export const employeePortalSchema = z.object({
+  createLogin: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()),
+  portalEmail: z.preprocess(
+    blankToNull,
+    z
+      .email("Enter a valid email")
+      .max(254)
+      .transform((s) => s.trim().toLowerCase())
+      .nullable(),
+  ),
+});
 export type EmployeePortalInput = z.infer<typeof employeePortalSchema>;
 
 /**

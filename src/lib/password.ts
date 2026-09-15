@@ -4,6 +4,14 @@ import bcrypt from "bcryptjs";
 export const BCRYPT_ROUNDS = 12;
 
 export const PASSWORD_MIN_LENGTH = 12;
+
+/**
+ * The temporary password every new or reset EMPLOYEE (self-service) login starts with. Chosen
+ * by the owner so HR can tell people a single, easy value; it is exempt from the policy, is shown
+ * on the screens that set it, and must be replaced at first sign-in (the replacement must pass
+ * the policy). Staff accounts never use it.
+ */
+export const EMPLOYEE_TEMP_PASSWORD = "123456789";
 export const PASSWORD_MAX_LENGTH = 128;
 
 export async function hashPassword(plain: string): Promise<string> {

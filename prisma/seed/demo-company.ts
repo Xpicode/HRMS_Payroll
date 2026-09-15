@@ -5,11 +5,12 @@
  * PhilHealth ceilings. Rates are illustrative; edit them in the UI.
  *
  * Also creates one employee self-service login (Phase 9) for DEMO-0001 so the portal can be
- * tried at once: dorothy@example.com / Dorothy-Demo-2026 (must be changed at first sign-in).
+ * tried at once: dorothy@example.com with the fixed temporary password (must be changed at first sign-in).
  *
  * Skipped when SEED_DEMO_COMPANY=false (set that in production).
  */
 import bcrypt from "bcryptjs";
+import { EMPLOYEE_TEMP_PASSWORD } from "../../src/lib/password";
 import type { PrismaClient } from "../../src/generated/prisma/client";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
@@ -217,7 +218,7 @@ async function seedDemoLogin(prisma: PrismaClient, companyId: string, employeeId
       email: "dorothy@example.com",
       name: "Dorothy Dela Cruz",
       role: "EMPLOYEE",
-      passwordHash: await bcrypt.hash("Dorothy-Demo-2026", 12),
+      passwordHash: await bcrypt.hash(EMPLOYEE_TEMP_PASSWORD, 12),
       mustChangePassword: true,
       employeeId,
       companies: { create: { companyId } },

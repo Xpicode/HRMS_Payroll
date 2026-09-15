@@ -1,9 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { KeyRoundIcon, MonitorSmartphoneIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/form/field";
@@ -11,7 +10,9 @@ import { FormAlert } from "@/components/form/form-alert";
 import { SubmitButton } from "@/components/form/submit-button";
 import { ConfirmSubmit } from "@/components/form/confirm-submit";
 import { initialActionState } from "@/lib/action-result";
+import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/dates";
+import { EMPLOYEE_TEMP_PASSWORD } from "@/lib/password";
 import {
   createEmployeeLoginAction,
   resetEmployeeLoginAction,
@@ -102,15 +103,7 @@ function CreateLogin({
           required
         />
       </Field>
-      <Field
-        label="Temporary password"
-        name="password"
-        error={errors?.password}
-        required
-        hint="At least 12 characters with a letter and a digit. They must change it at first sign-in."
-      >
-        <Input id="password" name="password" type="password" autoComplete="new-password" required />
-      </Field>
+      <TempPasswordNote />
       <SubmitButton pendingText="Creating…">
         <KeyRoundIcon data-icon="inline-start" />
         Create login
@@ -128,7 +121,6 @@ function ExistingLogin({
   employeeId: string;
   login: PortalLogin;
 }) {
-  const [showReset, setShowReset] = useState(false);
   const [resetState, resetAction] = useActionState(
     resetEmployeeLoginAction.bind(null, companyId, employeeId),
     initialActionState,
@@ -137,11 +129,11 @@ function ExistingLogin({
     setEmployeeLoginActiveAction.bind(null, companyId, employeeId, !login.isActive),
     initialActionState,
   );
-  const resetErrors = !resetState.ok ? resetState.fieldErrors : undefined;
 
   return (
     <div className="space-y-4">
       <FormAlert state={toggleState} />
+      <FormAlert state={resetState} />
       <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
         <dt className="text-muted-foreground">Email</dt>
         <dd className="font-medium break-all">{login.email}</dd>
@@ -161,17 +153,20 @@ function ExistingLogin({
         <dd>{login.lastLoginAt ? formatDateTime(new Date(login.lastLoginAt)) : "Never"}</dd>
       </dl>
 
+      {login.mustChangePassword ? <TempPasswordNote compact /> : null}
+
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-expanded={showReset}
-          onClick={() => setShowReset((v) => !v)}
-        >
-          <KeyRoundIcon data-icon="inline-start" />
-          Reset password
-        </Button>
+        <form action={resetAction}>
+          <ConfirmSubmit
+            variant="outline"
+            size="sm"
+            message={`Reset this login to the temporary password ${EMPLOYEE_TEMP_PASSWORD}? The employee is signed out everywhere and must choose a new password at next sign-in.`}
+            pendingText="Resetting…"
+          >
+            <KeyRoundIcon data-icon="inline-start" />
+            Reset password
+          </ConfirmSubmit>
+        </form>
         <form action={toggleAction}>
           <ConfirmSubmit
             variant={login.isActive ? "outline" : "default"}
@@ -187,34 +182,28 @@ function ExistingLogin({
           </ConfirmSubmit>
         </form>
       </div>
+    </div>
+  );
+}
 
-      {showReset ? (
-        <form
-          action={resetAction}
-          className="space-y-3 rounded-lg border bg-muted/30 p-3"
-          noValidate
-        >
-          <FormAlert state={resetState} />
-          <Field
-            label="Temporary password"
-            name="password"
-            error={resetErrors?.password}
-            required
-            hint="Signs the employee out everywhere; they must choose a new password at next sign-in."
-          >
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-            />
-          </Field>
-          <SubmitButton variant="outline" size="sm" pendingText="Resetting…">
-            Set temporary password
-          </SubmitButton>
-        </form>
-      ) : null}
+/** The fixed temporary password, printed where HR sets it so they can pass it on. */
+function TempPasswordNote({ compact }: { compact?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-primary/25 bg-primary/5 px-3",
+        compact ? "py-2 text-xs" : "py-2.5 text-sm",
+      )}
+    >
+      <span className="text-muted-foreground">Temporary password</span>
+      <code className="rounded bg-background/80 px-2 py-0.5 font-mono text-base font-semibold tracking-wider text-primary select-all">
+        {EMPLOYEE_TEMP_PASSWORD}
+      </code>
+      <span className="text-muted-foreground">
+        {compact
+          ? "Not changed yet."
+          : "Tell the employee in person; they must choose their own at first sign-in."}
+      </span>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import type { Role } from "@/generated/prisma/enums";
 import { env } from "@/lib/env";
 import { audit, type AuditWriter } from "@/lib/audit";
 import { AppError } from "@/lib/action-result";
-import { dummyHash, hashPassword, verifyPassword } from "@/lib/password";
+import { dummyHash, EMPLOYEE_TEMP_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { postLoginPath } from "@/lib/routes";
 import { assertCompanyAccess, type Scope } from "@/lib/scope";
 import { assertPermission } from "@/lib/session";
@@ -278,7 +278,7 @@ export async function createEmployeeLogin(
   if (await repo.findUserByEmployeeId(employeeId))
     throw new AppError("This employee already has a login.");
   await assertLoginEmailFree(input.email);
-  const passwordHash = await hashPassword(input.password);
+  const passwordHash = await hashPassword(EMPLOYEE_TEMP_PASSWORD);
   return repo.transaction((tx) =>
     insertEmployeeLogin(tx, scope, companyId, employee, input.email, passwordHash),
   );
@@ -331,7 +331,7 @@ async function insertEmployeeLogin(
 /**
  * Called by the employees module while it creates a new employee: the login is written in the
  * same transaction, so a rejected login (duplicate email) rolls the employee back too. The
- * caller must have hashed the password before opening the transaction (bcrypt is slow).
+ * caller hashes the temporary password before opening the transaction (bcrypt is slow).
  */
 export async function createEmployeeLoginWithin(
   tx: repo.UserCreator & AuditWriter,
@@ -353,15 +353,10 @@ async function existingLogin(scope: Scope, companyId: string, employeeId: string
   return user;
 }
 
-/** Temporary password for the employee's login; they must change it at next sign-in. */
-export async function resetEmployeeLogin(
-  scope: Scope,
-  companyId: string,
-  employeeId: string,
-  input: ResetPasswordInput,
-) {
+/** Back to the fixed temporary password; the employee must change it at next sign-in. */
+export async function resetEmployeeLogin(scope: Scope, companyId: string, employeeId: string) {
   const user = await existingLogin(scope, companyId, employeeId);
-  const passwordHash = await hashPassword(input.password);
+  const passwordHash = await hashPassword(EMPLOYEE_TEMP_PASSWORD);
   return repo.transaction(async (tx) => {
     const after = await repo.setPassword(user.id, passwordHash, true, tx);
     await audit(

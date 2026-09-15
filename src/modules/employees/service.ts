@@ -12,7 +12,7 @@ import {
   createEmployeeLoginWithin,
   disableEmployeeLogin,
 } from "@/modules/auth/service";
-import { hashPassword } from "@/lib/password";
+import { EMPLOYEE_TEMP_PASSWORD, hashPassword } from "@/lib/password";
 import * as repo from "./repo";
 import {
   CSV_COLUMNS,
@@ -144,8 +144,8 @@ export async function getRateContext(scope: Scope, companyId: string) {
 
 export type SaveOptions = { confirmWarnings: boolean };
 
-/** Portal login to create together with the employee (Phase 9); `null` = none. */
-export type PortalLoginRequest = { email: string | null; password: string } | null;
+/** Portal login to create together with the employee (Phase 9); `null` = none. Email `null` = the employee's. */
+export type PortalLoginRequest = { email: string | null } | null;
 
 export async function createEmployee(
   scope: Scope,
@@ -175,7 +175,7 @@ export async function createEmployee(
         throw new AppError(e.message, { portalEmail: e.fieldErrors.email });
       throw e;
     }
-    login = { email, passwordHash: await hashPassword(portal.password) };
+    login = { email, passwordHash: await hashPassword(EMPLOYEE_TEMP_PASSWORD) };
   }
 
   try {

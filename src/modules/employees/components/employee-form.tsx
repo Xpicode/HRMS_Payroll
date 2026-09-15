@@ -21,6 +21,7 @@ import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { initialActionState } from "@/lib/action-result";
 import { EmployeeStatus, TaxStatus } from "@/generated/prisma/enums";
+import { EMPLOYEE_TEMP_PASSWORD } from "@/lib/password";
 import { EMPLOYEE_STATUS_LABELS, formatGovId } from "../schema";
 import { createEmployeeAction, updateEmployeeAction } from "../actions";
 
@@ -393,20 +394,17 @@ export function EmployeeForm(props: Props) {
                           autoComplete="off"
                         />
                       </Field>
-                      <Field
-                        label="Temporary password"
-                        name="portalPassword"
-                        error={errors?.portalPassword}
-                        required
-                        hint="At least 12 characters with a letter and a digit; changed at first sign-in."
-                      >
-                        <Input
-                          id="portalPassword"
-                          name="portalPassword"
-                          type="password"
-                          autoComplete="new-password"
-                        />
-                      </Field>
+                      <div className="space-y-1.5">
+                        <p className="text-[13px] font-medium">Temporary password</p>
+                        <div className="flex h-8 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3">
+                          <code className="font-mono text-sm font-semibold tracking-wider text-primary select-all">
+                            {EMPLOYEE_TEMP_PASSWORD}
+                          </code>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Tell the employee in person; they must choose their own at first sign-in.
+                        </p>
+                      </div>
                     </FieldGrid>
                   ) : null}
                 </div>
