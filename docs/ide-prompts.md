@@ -185,6 +185,27 @@ Acceptance: restore from backup on a clean machine yields identical payslip PDFs
 
 ---
 
+## Phase 9 — Employee self-service portal
+
+```
+Implement Phase 9 (Employee self-service portal) from docs/hrms-build-plan.md.
+
+Deliver:
+- EMPLOYEE role: one login per employee record, created / password-reset / disabled from the employee's
+  Details page (ADMIN, PAYROLL_OFFICER); disabled automatically on separation; not assignable from Users.
+- Portal under /me with its own shell (no company switcher, no staff nav): home, payslips of RELEASED / LOCKED
+  periods with the PDF, read-only DTR per cutoff, leave credits + requests (file, withdraw), profile with
+  masked government IDs, change password (forced on first sign-in).
+- Routing: staff never land under /me, employees never under /app (proxy + layouts). Employees keep the same
+  throttles, lockout, session limits and audit trail as staff.
+- Authorization: an EMPLOYEE login has no staff permission; services accept it only for its own employee id.
+
+Acceptance: an employee login sees only their own data; every URL, server action and file route aimed at a
+colleague or a staff screen is refused (404 / permission error); separating the employee disables the login.
+```
+
+---
+
 ## Fix / follow-up prompt template
 
 ```

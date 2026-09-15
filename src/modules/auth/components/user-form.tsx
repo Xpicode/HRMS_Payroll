@@ -10,8 +10,8 @@ import { FormAlert } from "@/components/form/form-alert";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { initialActionState } from "@/lib/action-result";
-import { ROLE_LABELS } from "@/lib/permissions";
-import { Role } from "@/generated/prisma/enums";
+import { ROLE_LABELS, STAFF_ROLES } from "@/lib/permissions";
+import type { Role } from "@/generated/prisma/enums";
 import { createUserAction, updateUserAction } from "../actions";
 
 type CompanyOption = { id: string; code: string; legalName: string };
@@ -89,7 +89,7 @@ export function UserForm(props: Props) {
                 onChange={(e) => setRole(e.target.value as Role)}
                 disabled={props.isSelf}
               >
-                {Object.values(Role).map((r) => (
+                {STAFF_ROLES.map((r) => (
                   <option key={r} value={r}>
                     {ROLE_LABELS[r]}
                   </option>

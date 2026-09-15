@@ -8,9 +8,12 @@ import { getEmployee, getEmployeeNoSeries, listDepartments } from "@/modules/emp
 import { EmployeeForm } from "@/modules/employees/components/employee-form";
 import { EmployeeTabs } from "@/modules/employees/components/employee-tabs";
 import { SeparationCard } from "@/modules/employees/components/separation-card";
+import { PortalAccessCard } from "@/modules/auth/components/portal-access-card";
+import { getEmployeeLogin } from "@/modules/auth/service";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Employee" };
 
@@ -19,7 +22,7 @@ export default async function EmployeeDetailsPage({
   searchParams,
 }: {
   params: Promise<{ companyId: string; employeeId: string }>;
-  searchParams: Promise<{ separated?: string; reinstated?: string }>;
+  searchParams: Promise<{ separated?: string; reinstated?: string; portal?: string }>;
 }) {
   const { companyId, employeeId } = await params;
   const { user, company } = await requireCompany(companyId);
@@ -33,6 +36,8 @@ export default async function EmployeeDetailsPage({
   ]);
   if (!employee) notFound();
   const separationDate = employee.separationDate ? toIsoDate(employee.separationDate) : null;
+  const canPortal = roleCan(user.role, "employees.portal_access");
+  const login = canPortal ? await getEmployeeLogin(scope, companyId, employeeId) : null;
 
   return (
     <>
@@ -54,16 +59,18 @@ export default async function EmployeeDetailsPage({
         active="details"
         showLoans={roleCan(user.role, "loans.view")}
       />
-      {sp.separated || sp.reinstated ? (
+      {sp.separated || sp.reinstated || sp.portal === "created" ? (
         <Alert className="mb-6 border-success/30 bg-success/5 text-success">
           <AlertTitle>
-            {sp.reinstated
-              ? "Employee reinstated."
-              : "Employee separated; the payslip of that period will be marked final pay."}
+            {sp.portal === "created"
+              ? "Portal login created. Tell the employee the temporary password in person; they must change it at first sign-in."
+              : sp.reinstated
+                ? "Employee reinstated."
+                : "Employee separated; the payslip of that period will be marked final pay."}
           </AlertTitle>
         </Alert>
       ) : null}
-      <div className="mb-6">
+      <div className={cn("mb-6 grid gap-6", canPortal && "lg:grid-cols-2")}>
         <SeparationCard
           companyId={companyId}
           employeeId={employeeId}
@@ -73,6 +80,22 @@ export default async function EmployeeDetailsPage({
           canReinstate={roleCan(user.role, "employees.reinstate")}
           today={todayInManila()}
         />
+        {canPortal ? (
+          <PortalAccessCard
+            companyId={companyId}
+            employeeId={employeeId}
+            defaultEmail={employee.email}
+            separated={employee.status === "SEPARATED"}
+            login={
+              login
+                ? {
+                    ...login,
+                    lastLoginAt: login.lastLoginAt ? login.lastLoginAt.toISOString() : null,
+                  }
+                : null
+            }
+          />
+        ) : null}
       </div>
       <EmployeeForm
         mode="edit"

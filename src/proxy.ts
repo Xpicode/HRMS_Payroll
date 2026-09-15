@@ -2,11 +2,13 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/lib/auth.config";
 import { sessionExpired } from "@/lib/session-age";
+import { homePathFor, passwordPathFor, pathAllowedFor } from "@/lib/routes";
 
 /**
  * Optimistic auth gate (cookie only, no database):
- *  - /app/**  and /api/files/**  require a session; otherwise redirect to /login (401 for APIs)
- *  - users flagged must-change-password are held on /app/account/password
+ *  - /app/**, /me/** and /api/files/** require a session; otherwise redirect to /login (401 for APIs)
+ *  - staff never land under /me and employee logins never under /app (each is sent home)
+ *  - users flagged must-change-password are held on their password page
  * Real authorization (company membership, roles, disabled users, revoked sessions)
  * happens in src/lib/session.ts on every server request.
  */
@@ -14,7 +16,12 @@ const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { pathname, search } = req.nextUrl;
-  const isProtected = pathname.startsWith("/app") || pathname.startsWith("/api/files");
+  const isProtected =
+    pathname === "/app" ||
+    pathname.startsWith("/app/") ||
+    pathname === "/me" ||
+    pathname.startsWith("/me/") ||
+    pathname.startsWith("/api/files");
   if (!isProtected) return NextResponse.next();
 
   const user = req.auth && !sessionExpired(req.auth.issuedAt) ? req.auth.user : undefined;
@@ -27,12 +34,15 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  if (
-    user.mustChangePassword &&
-    !pathname.startsWith("/app/account/password") &&
-    !pathname.startsWith("/api/")
-  ) {
-    return NextResponse.redirect(new URL("/app/account/password", req.nextUrl));
+  if (pathname.startsWith("/api/")) return NextResponse.next();
+
+  if (!pathAllowedFor(user.role, pathname)) {
+    return NextResponse.redirect(new URL(homePathFor(user.role), req.nextUrl));
+  }
+
+  const passwordPath = passwordPathFor(user.role);
+  if (user.mustChangePassword && !pathname.startsWith(passwordPath)) {
+    return NextResponse.redirect(new URL(passwordPath, req.nextUrl));
   }
 
   return NextResponse.next();

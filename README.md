@@ -1,9 +1,9 @@
 # HRMS Payroll
 
-Multi-company HRMS and Philippine payroll for Upright. Internal users only; employees do not log in.
+Multi-company HRMS and Philippine payroll for Upright. Staff work under `/app`; employees have a separate self-service portal under `/me` (Phase 9).
 Plan: [docs/hrms-build-plan.md](docs/hrms-build-plan.md). Rules: [AGENTS.md](AGENTS.md).
 
-Status: **Phase 8** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing, leave with credits, 201 attachments, separation / final pay, company dashboard, government reports, 13th month, year-end annualization, email outbox, backups, hardening and a production deployment). Deploying: [docs/deployment.md](docs/deployment.md).
+Status: **Phase 9** (foundation, employees, attendance incl. DTR card scanning, payroll engine, pay-period lifecycle with immutable approved payslips, loans, payslip PDFs and printing, leave with credits, 201 attachments, separation / final pay, company dashboard, government reports, 13th month, year-end annualization, email outbox, backups, hardening, a production deployment, and an employee self-service portal). Deploying: [docs/deployment.md](docs/deployment.md).
 
 ## Run locally from a fresh clone
 
@@ -85,7 +85,7 @@ docker/                  dev image + entrypoint
   Login is rate-limited per IP, accounts lock after 10 failures for 15 min, and every attempt is audited.
   Password policy: 12+ chars, letter + digit, not containing the email name. New/reset passwords must be changed at first login.
   A password change revokes every existing session for that user.
-- **Authorization**: roles `ADMIN`, `PAYROLL_OFFICER`, `ENCODER` (`src/lib/permissions.ts`). Company membership via `user_companies`.
+- **Authorization**: roles `ADMIN`, `PAYROLL_OFFICER`, `ENCODER` and, since Phase 9, `EMPLOYEE` (`src/lib/permissions.ts`). Company membership via `user_companies`.
   Every tenant query goes through `scoped()` (`src/lib/scope.ts`), which injects `company_id IN (…)` and refuses unscoped
   unique lookups. Pages return **404** for companies the user is not assigned to, so ids are not enumerable.
 - **Uploads**: logos are validated by content (sharp), re-encoded to PNG, stored under `DATA_DIR`, and served only through
@@ -326,6 +326,32 @@ docker/                  dev image + entrypoint
   payslip PDFs byte-for-byte (SHA-256 identical).
 - **Load check** (`pnpm load-check`): a throw-away 200-employee company over one cutoff — compute ≈ 2 s,
   approve ≈ 1 s, 200 payslip PDFs + batch ≈ 60 s on the dev PC (budget 2 min).
+
+## Employee self-service portal (Phase 9)
+
+- **Who**: an `EMPLOYEE` login is a `users` row with `employee_id` set (one per employee, unique). It is created
+  from the employee's **Details** page (card "Portal access": sign-in email + temporary password) by an ADMIN or a
+  PAYROLL_OFFICER of that company, reset or disabled from the same card, and **disabled automatically when the
+  employee is separated** (same transaction, audited as a User change). The Users screen lists these logins but
+  cannot edit them as staff; `EMPLOYEE` is not a role it can assign. Fresh installs seed one for the demo company:
+  `dorothy@example.com` / `Dorothy-Demo-2026` (must be changed at first sign-in).
+- **Where**: `/me` (`src/app/me`, module `src/modules/self-service`) with its own shell — header nav on desktop,
+  bottom tabs on phones. Home (latest payslip, this cutoff, leave credits), **Payslips** (RELEASED / LOCKED periods
+  only, on-screen breakdown from the stored lines, PDF via `/api/files/me/payslips/:payslipId` once payroll has
+  rendered it), **Attendance** (read-only DTR per cutoff), **Leave** (credits, own requests, file and withdraw
+  pending ones — approval stays with HR/payroll on the staff side), **Profile** (government IDs masked to the last
+  four), change password. No employee id ever appears in a portal URL; every read uses the id from the session.
+- **Separation of areas**: `src/lib/routes.ts` decides `/app` vs `/me`. The proxy redirects a staff user who opens
+  `/me` and an employee who opens anything under `/app`; the `/app` layout uses `requireStaff()` and the `/me`
+  layout `requireEmployee()`. Sign-in lands each kind of user in its own area (or on its password page first).
+- **Authorization**: `roleCan("EMPLOYEE", …)` is false for every permission (unit-tested). Services that an
+  employee may use for their own record call `assertPermissionOrSelf(scope, permission, employeeId)` (own record,
+  DTR, balances, own requests, released payslips) or `assertPermissionOrEmployee` (leave types); everything else
+  (`listEmployees`, periods, approvals, reports, documents, other employees' rows) is refused. Same throttles,
+  lockout, session limits, forced password change and audit trail as staff.
+- **Tests**: `tests/self-service.test.ts` (role matrix, routing, schemas) and
+  `tests/integration/self-service.test.ts` (login lifecycle, isolation, payslip visibility by period status, the
+  PDF, separation disabling the login).
 
 ## Look and feel
 

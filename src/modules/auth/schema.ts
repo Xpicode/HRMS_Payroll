@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Role } from "@/generated/prisma/enums";
 import { checkPasswordPolicy, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/password";
+import { STAFF_ROLES } from "@/lib/permissions";
 
 export const emailSchema = z
   .email("Enter a valid email address")
@@ -14,6 +15,8 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const roleSchema = z.enum(Role);
+/** Roles the Users screen may assign. EMPLOYEE logins are created from the employee record. */
+export const staffRoleSchema = z.enum(STAFF_ROLES);
 
 const uuidList = z.preprocess(
   (v) => (v === undefined || v === null || v === "" ? [] : Array.isArray(v) ? v : [v]),
@@ -41,7 +44,7 @@ export const createUserSchema = z
   .object({
     email: emailSchema,
     name: z.string().trim().min(2, "Enter the person's name").max(100),
-    role: roleSchema,
+    role: staffRoleSchema,
     password: newPassword,
     companyIds: uuidList,
   })
@@ -50,11 +53,17 @@ export type CreateUserInput = z.infer<typeof createUserSchema>;
 
 export const updateUserSchema = z.object({
   name: z.string().trim().min(2, "Enter the person's name").max(100),
-  role: roleSchema,
+  role: staffRoleSchema,
   isActive: checkbox,
   companyIds: uuidList,
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+
+/** Self-service login for an employee (Phase 9): the sign-in email and a temporary password. */
+export const employeeLoginSchema = z
+  .object({ email: emailSchema, password: newPassword })
+  .superRefine((d, ctx) => applyPolicy(ctx, d));
+export type EmployeeLoginInput = z.infer<typeof employeeLoginSchema>;
 
 export const resetPasswordSchema = z
   .object({ password: newPassword })

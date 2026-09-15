@@ -6,7 +6,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { clientIp, isUuid } from "@/lib/request";
 import type { Scope } from "@/lib/scope";
-import { roleCan, type Permission } from "@/lib/permissions";
+import { canActAsEmployee, canActOnEmployee, roleCan, type Permission } from "@/lib/permissions";
+import { homePathFor, isEmployeeRole } from "@/lib/routes";
 import { ForbiddenError } from "@/lib/action-result";
 import { sessionExpired } from "@/lib/session-age";
 import type { Role } from "@/generated/prisma/enums";
@@ -25,7 +26,9 @@ export type CurrentUser = {
   name: string;
   role: Role;
   mustChangePassword: boolean;
-  /** Companies this user may open. ADMIN = every active company. */
+  /** EMPLOYEE logins: the employee record this user is; null for staff. */
+  employeeId: string | null;
+  /** Companies this user may open. ADMIN = every active company; EMPLOYEE = their own. */
   companies: CompanySummary[];
 };
 
@@ -81,6 +84,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     name: user.name,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
+    employeeId: user.employeeId,
     companies,
   };
 });
@@ -97,6 +101,21 @@ export async function requirePermission(permission: Permission): Promise<Current
   const user = await requireUser();
   if (!roleCan(user.role, permission)) notFound();
   return user;
+}
+
+/** For /app layouts: staff only. An employee login is sent to its own portal instead. */
+export async function requireStaff(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (isEmployeeRole(user.role)) redirect(homePathFor(user.role));
+  return user;
+}
+
+/** For /me layouts: an EMPLOYEE login. Staff are sent back to /app. */
+export async function requireEmployee(): Promise<CurrentUser & { employeeId: string }> {
+  const user = await requireUser();
+  if (!isEmployeeRole(user.role)) redirect(homePathFor(user.role));
+  if (!user.employeeId) notFound();
+  return { ...user, employeeId: user.employeeId };
 }
 
 /** For pages under /app/[companyId]: validates the id and the user's membership. */
@@ -117,6 +136,7 @@ async function scopeFor(user: CurrentUser): Promise<Scope> {
     role: user.role,
     companyIds: user.role === "ADMIN" ? null : user.companies.map((c) => c.id),
     ip: clientIp(h),
+    employeeId: user.employeeId,
   };
 }
 
@@ -139,6 +159,24 @@ export const getAccountScope = cache(async (): Promise<Scope> => scopeFor(await 
 /** For services: throws (actions turn it into a friendly error). */
 export function assertPermission(scope: Scope, permission: Permission): void {
   if (!roleCan(scope.role, permission)) {
+    throw new ForbiddenError("You do not have permission to do that.");
+  }
+}
+
+/** Staff permission, or an EMPLOYEE login acting on its own record (self-service). */
+export function assertPermissionOrSelf(
+  scope: Scope,
+  permission: Permission,
+  employeeId: string,
+): void {
+  if (!canActOnEmployee(scope, permission, employeeId)) {
+    throw new ForbiddenError("You do not have permission to do that.");
+  }
+}
+
+/** Staff permission, or any EMPLOYEE login (company-level reads such as leave types). */
+export function assertPermissionOrEmployee(scope: Scope, permission: Permission): void {
+  if (!canActAsEmployee(scope, permission)) {
     throw new ForbiddenError("You do not have permission to do that.");
   }
 }

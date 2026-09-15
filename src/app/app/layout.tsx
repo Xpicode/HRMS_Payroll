@@ -1,10 +1,11 @@
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 
 /**
- * Everything under /app requires a valid, active user. The proxy already checked the
- * cookie; this checks the database (disabled users, revoked sessions).
+ * Everything under /app requires a valid, active staff user. The proxy already checked the
+ * cookie; this checks the database (disabled users, revoked sessions) and sends employee
+ * self-service logins to /me.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  await requireUser();
+  await requireStaff();
   return children;
 }

@@ -40,6 +40,8 @@ export const PERMISSIONS = {
   /** Separation is a dated, audited HR action; reinstating is admin-only. */
   "employees.separate": ["ADMIN", "PAYROLL_OFFICER"],
   "employees.reinstate": ["ADMIN"],
+  /** Self-service logins (Phase 9): create, reset or disable an employee's portal access. */
+  "employees.portal_access": ["ADMIN", "PAYROLL_OFFICER"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -48,8 +50,41 @@ export function roleCan(role: Role, permission: Permission): boolean {
   return (PERMISSIONS[permission] as readonly Role[]).includes(role);
 }
 
+/** Roles an administrator may hand out on the Users screen. EMPLOYEE logins come from the employee record. */
+export const STAFF_ROLES = [
+  "ADMIN",
+  "PAYROLL_OFFICER",
+  "ENCODER",
+] as const satisfies readonly Role[];
+
+type ActorLike = { role: Role; employeeId?: string | null };
+
+/**
+ * Self-service (Phase 9): an EMPLOYEE login has no staff permission at all, but may act on
+ * its own employee record where a page or service allows "staff permission OR self".
+ */
+export function canActOnEmployee(
+  actor: ActorLike,
+  permission: Permission,
+  employeeId: string,
+): boolean {
+  if (roleCan(actor.role, permission)) return true;
+  return (
+    actor.role === "EMPLOYEE" &&
+    typeof actor.employeeId === "string" &&
+    actor.employeeId === employeeId
+  );
+}
+
+/** Company-level reads any linked employee may do inside their own company (e.g. leave types). */
+export function canActAsEmployee(actor: ActorLike, permission: Permission): boolean {
+  if (roleCan(actor.role, permission)) return true;
+  return actor.role === "EMPLOYEE" && typeof actor.employeeId === "string";
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Administrator",
   PAYROLL_OFFICER: "Payroll Officer",
   ENCODER: "Encoder",
+  EMPLOYEE: "Employee",
 };

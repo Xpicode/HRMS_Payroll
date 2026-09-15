@@ -4,8 +4,12 @@
  * employee, a daily employee, a mid-salary monthly employee and one above the SSS /
  * PhilHealth ceilings. Rates are illustrative; edit them in the UI.
  *
+ * Also creates one employee self-service login (Phase 9) for DEMO-0001 so the portal can be
+ * tried at once: dorothy@example.com / Dorothy-Demo-2026 (must be changed at first sign-in).
+ *
  * Skipped when SEED_DEMO_COMPANY=false (set that in production).
  */
+import bcrypt from "bcryptjs";
 import type { PrismaClient } from "../../src/generated/prisma/client";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
@@ -158,9 +162,10 @@ export async function seedDemoCompany(prisma: PrismaClient) {
     },
   ];
 
+  let firstEmployeeId: string | null = null;
   for (const e of employees) {
     const { pay, ...person } = e;
-    await prisma.employee.create({
+    const created = await prisma.employee.create({
       data: {
         companyId: company.id,
         ...person,
@@ -180,6 +185,35 @@ export async function seedDemoCompany(prisma: PrismaClient) {
         },
       },
     });
+    firstEmployeeId ??= created.id;
+  }
+  if (
+    firstEmployeeId &&
+    !(await prisma.user.findUnique({ where: { email: "dorothy@example.com" } }))
+  ) {
+    const login = await prisma.user.create({
+      data: {
+        email: "dorothy@example.com",
+        name: "Dorothy Dela Cruz",
+        role: "EMPLOYEE",
+        passwordHash: await bcrypt.hash("Dorothy-Demo-2026", 12),
+        mustChangePassword: true,
+        employeeId: firstEmployeeId,
+        companies: { create: { companyId: company.id } },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        entity: "User",
+        entityId: login.id,
+        action: "CREATE",
+        companyId: company.id,
+        after: { email: login.email, role: "EMPLOYEE", employeeNo: "DEMO-0001", seeded: true },
+      },
+    });
+    console.log(
+      "Created demo employee login dorothy@example.com (must change password at first sign-in).",
+    );
   }
   await prisma.auditLog.create({
     data: {

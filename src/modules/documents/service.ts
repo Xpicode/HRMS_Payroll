@@ -2,7 +2,7 @@ import "server-only";
 import { AppError } from "@/lib/action-result";
 import { toIsoDate } from "@/lib/dates";
 import { assertCompanyAccess, type Scope } from "@/lib/scope";
-import { assertPermission } from "@/lib/session";
+import { assertPermission, assertPermissionOrSelf } from "@/lib/session";
 import { getCompany, readLogo } from "@/modules/companies/service";
 import { getEmployee } from "@/modules/employees/service";
 import * as payroll from "@/modules/payroll/service";
@@ -288,6 +288,26 @@ export async function readPayslipPdf(
   const period = await payroll.getPeriod(scope, companyId, periodId);
   if (!period) return null;
   return repo.readPdf(companyId, periodId, file);
+}
+
+/**
+ * Self-service (Phase 9): the stored PDF of one of the employee's own released payslips.
+ * Null until the period's PDFs have been generated.
+ */
+export async function readOwnPayslipPdf(
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+  payslipId: string,
+): Promise<{ bytes: Buffer; file: string } | null> {
+  assertPermissionOrSelf(scope, "payroll.view", employeeId);
+  assertCompanyAccess(scope, companyId);
+  const slip = await payroll.getReleasedPayslipOf(scope, companyId, employeeId, payslipId);
+  if (!slip?.pdfPath) return null;
+  const file = slip.pdfPath.split("/").pop() ?? "";
+  if (!repo.PDF_FILE_RE.test(file)) return null;
+  const bytes = await repo.readPdf(companyId, slip.payPeriodId, file);
+  return bytes ? { bytes, file } : null;
 }
 
 /** Run queued jobs now (called right after an action queues one, and by the worker). */

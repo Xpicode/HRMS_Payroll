@@ -25,6 +25,8 @@ enum Role {
   ADMIN
   PAYROLL_OFFICER
   ENCODER
+  /// Self-service: a login tied to exactly one employee record (Phase 9). No staff permissions.
+  EMPLOYEE
 }
 
 model User {
@@ -36,6 +38,8 @@ model User {
   isActive           Boolean   @default(true) @map("is_active")
   // security
   mustChangePassword Boolean   @default(false) @map("must_change_password")
+  /// EMPLOYEE logins only: the employee record this user is (one login per employee).
+  employeeId         String?   @unique @map("employee_id") @db.Uuid
   failedLoginCount   Int       @default(0) @map("failed_login_count")
   lockedUntil        DateTime? @map("locked_until") @db.Timestamptz(3)
   passwordChangedAt  DateTime  @default(now()) @map("password_changed_at") @db.Timestamptz(3)
@@ -43,6 +47,7 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  employee        Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   companies       UserCompany[]
   auditLogs       AuditLog[]
   approvedPeriods PayPeriod[]         @relation("PayPeriodApprovedBy")
@@ -288,6 +293,8 @@ model Employee {
   leaveBalances  LeaveBalance[]
   leaveRequests  LeaveRequest[]
   documents      EmployeeDocument[]
+  /// The self-service login for this employee, if one was created (Phase 9).
+  login          User?
 
   @@unique([companyId, employeeNo])
   @@index([companyId, status])

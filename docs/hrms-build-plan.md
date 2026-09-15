@@ -18,7 +18,7 @@ Goals for v1 (in priority order)
 4. Solid HR core: employee 201 record, attendance / DTR, leave, cash advances and loans.
 5. Government reports later: SSS R-3/R-5, PhilHealth RF-1, Pag-IBIG MCRF, BIR 1601-C and 2316 / alphalist.
 
-Non-goals for v1: employee self-service portal, biometric device integration (CSV import only), recruitment / applicant tracking, performance reviews, mobile app, online bank disbursement.
+Non-goals for v1: biometric device integration (CSV import only), recruitment / applicant tracking, performance reviews, mobile app, online bank disbursement. (Employee self-service was originally out of scope and was added as Phase 9.)
 
 ---
 
@@ -229,6 +229,11 @@ Accept: monthly remittance totals equal the sum of payslip lines for that month 
 ### Phase 8 — Hardening and deployment
 
 Build: rate limiting on login, session expiry, audit log viewer, DB backup/restore procedure, health endpoint, production Docker image, deployment to the chosen host (NAS Container Manager or a VPS — decide then).
+
+### Phase 9 — Employee self-service portal
+
+Build: an `EMPLOYEE` role tied to exactly one employee record (created, reset and disabled from the employee's 201 page by ADMIN / PAYROLL_OFFICER; disabled automatically on separation); a separate portal under `/me` with its own shell — home, released payslips (on-screen breakdown + the stored PDF), read-only DTR per cutoff, leave credits and requests (file and withdraw), profile with masked government IDs, change password. Staff and employees are routed apart at the proxy (`/app` vs `/me`); an employee login has no staff permission and reaches its own rows only through "permission or self" checks in the services.
+Accept: an employee login sees only their own released payslips, DTR and leave; every URL, action and file route aimed at a colleague or at a staff screen is refused; separating the employee disables the login.
 
 ---
 

@@ -35,7 +35,7 @@ export default async function UsersPage({
       <PageHeader
         eyebrow="Administration"
         title="Users"
-        description="Administrators see every company. Payroll officers and encoders see only the companies assigned to them."
+        description="Administrators see every company. Payroll officers and encoders see only the companies assigned to them. Employee logins are created from the employee's record and see only their own data."
         actions={
           <Button render={<Link href="/app/users/new" />} nativeButton={false}>
             <PlusIcon data-icon="inline-start" />
@@ -64,56 +64,78 @@ export default async function UsersPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>
-                    <Link href={`/app/users/${u.id}`} className="font-medium hover:underline">
-                      {u.name}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">{u.email}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={u.role === "ADMIN" ? "default" : "secondary"}>
-                      {ROLE_LABELS[u.role]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {u.role === "ADMIN" ? (
-                      <span className="text-muted-foreground">All companies</span>
-                    ) : u.companies.length === 0 ? (
-                      <span className="text-warning-foreground">None assigned</span>
-                    ) : (
-                      <span className="font-mono text-xs">
-                        {u.companies.map((c) => c.company.code).join(", ")}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "Never"}
-                  </TableCell>
-                  <TableCell>
-                    {!u.isActive ? (
-                      <Badge variant="outline">Disabled</Badge>
-                    ) : u.isLocked ? (
-                      <Badge variant="destructive">Locked</Badge>
-                    ) : u.mustChangePassword ? (
-                      <Badge variant="outline">Must change password</Badge>
-                    ) : (
-                      <Badge variant="secondary">Active</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      render={<Link href={`/app/users/${u.id}`} />}
-                      nativeButton={false}
-                    >
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {users.map((u) => {
+                const employeeHref = u.employee
+                  ? `/app/${u.employee.companyId}/employees/${u.employee.id}`
+                  : null;
+                const href =
+                  u.role === "EMPLOYEE" && employeeHref ? employeeHref : `/app/users/${u.id}`;
+                return (
+                  <TableRow key={u.id}>
+                    <TableCell>
+                      <Link href={href} className="font-medium hover:underline">
+                        {u.name}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        {u.email}
+                        {u.employee ? (
+                          <span className="ml-1 font-mono text-[11px]">
+                            · {u.employee.employeeNo}
+                          </span>
+                        ) : null}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          u.role === "ADMIN"
+                            ? "default"
+                            : u.role === "EMPLOYEE"
+                              ? "outline"
+                              : "secondary"
+                        }
+                      >
+                        {ROLE_LABELS[u.role]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {u.role === "ADMIN" ? (
+                        <span className="text-muted-foreground">All companies</span>
+                      ) : u.companies.length === 0 ? (
+                        <span className="text-warning-foreground">None assigned</span>
+                      ) : (
+                        <span className="font-mono text-xs">
+                          {u.companies.map((c) => c.company.code).join(", ")}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "Never"}
+                    </TableCell>
+                    <TableCell>
+                      {!u.isActive ? (
+                        <Badge variant="outline">Disabled</Badge>
+                      ) : u.isLocked ? (
+                        <Badge variant="destructive">Locked</Badge>
+                      ) : u.mustChangePassword ? (
+                        <Badge variant="outline">Must change password</Badge>
+                      ) : (
+                        <Badge variant="secondary">Active</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        render={<Link href={href} />}
+                        nativeButton={false}
+                      >
+                        {u.role === "EMPLOYEE" ? "Open employee" : "Edit"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

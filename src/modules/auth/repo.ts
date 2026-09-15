@@ -1,5 +1,7 @@
 import "server-only";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma, type TxClient } from "@/lib/db";
+import { scoped, type Scope } from "@/lib/scope";
 import type { Role } from "@/generated/prisma/enums";
 
 /**
@@ -20,10 +22,24 @@ export const userWithCompanies = {
   passwordChangedAt: true,
   createdAt: true,
   updatedAt: true,
+  employeeId: true,
+  employee: {
+    select: { id: true, companyId: true, employeeNo: true, lastName: true, firstName: true },
+  },
   companies: {
     select: { companyId: true, company: { select: { id: true, code: true, legalName: true } } },
   },
 } as const;
+
+/** Any client that can update users: the raw transaction or a scoped() one (User is not a tenant model). */
+export type UserWriter = {
+  user: {
+    updateMany(args: {
+      where: Prisma.UserWhereInput;
+      data: Prisma.UserUpdateManyMutationInput;
+    }): Promise<{ count: number }>;
+  };
+};
 
 /** Runs `fn` in one database transaction (services never touch the raw client). */
 export function transaction<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
@@ -36,6 +52,40 @@ export function findUserByEmail(email: string) {
 
 export function findUserById(id: string) {
   return prisma.user.findUnique({ where: { id }, select: userWithCompanies });
+}
+
+/** The self-service login of an employee, if any (one per employee). */
+export function findUserByEmployeeId(employeeId: string) {
+  return prisma.user.findUnique({ where: { employeeId }, select: userWithCompanies });
+}
+
+/** The employee an admin wants to give a login to — through the caller's company scope. */
+export function findEmployeeForLogin(scope: Scope, companyId: string, employeeId: string) {
+  return scoped(scope).employee.findFirst({
+    where: { id: employeeId, companyId },
+    select: {
+      id: true,
+      companyId: true,
+      employeeNo: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      status: true,
+    },
+  });
+}
+
+export function setUserActive(id: string, isActive: boolean, tx: TxClient = prisma) {
+  return tx.user.update({ where: { id }, data: { isActive }, select: userWithCompanies });
+}
+
+/** Disables the EMPLOYEE login of an employee (separation). Returns how many rows changed (0 or 1). */
+export async function disableEmployeeUser(tx: UserWriter, employeeId: string): Promise<number> {
+  const r = await tx.user.updateMany({
+    where: { employeeId, role: "EMPLOYEE", isActive: true },
+    data: { isActive: false },
+  });
+  return r.count;
 }
 
 export function findUserAuthById(id: string) {
@@ -73,6 +123,7 @@ export function createUser(
     passwordHash: string;
     mustChangePassword: boolean;
     companyIds: string[];
+    employeeId?: string | null;
   },
   tx: TxClient = prisma,
 ) {
@@ -83,6 +134,7 @@ export function createUser(
       role: data.role,
       passwordHash: data.passwordHash,
       mustChangePassword: data.mustChangePassword,
+      employeeId: data.employeeId ?? null,
       companies: { create: data.companyIds.map((companyId) => ({ companyId })) },
     },
     select: userWithCompanies,

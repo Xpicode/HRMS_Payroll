@@ -20,6 +20,7 @@ import {
 import {
   changePasswordSchema,
   createUserSchema,
+  employeeLoginSchema,
   loginSchema,
   resetPasswordSchema,
   updateUserSchema,
@@ -135,6 +136,70 @@ export async function resetPasswordAction(
     return handleError(e);
   }
   return success("Temporary password set. The user must change it at next login.");
+}
+
+// ---------------------------------------------------------------------------
+// Employee self-service logins (Phase 9), from the employee's Details page
+// ---------------------------------------------------------------------------
+
+const employeePath = (companyId: string, employeeId: string) =>
+  `/app/${companyId}/employees/${employeeId}`;
+
+export async function createEmployeeLoginAction(
+  companyId: string,
+  employeeId: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!isUuid(companyId) || !isUuid(employeeId)) return fail("Invalid employee.");
+  const parsed = employeeLoginSchema.safeParse(formToObject(formData));
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    const scope = await getScope();
+    await service.createEmployeeLogin(scope, companyId, employeeId, parsed.data);
+  } catch (e) {
+    return handleError(e);
+  }
+  revalidatePath(employeePath(companyId, employeeId));
+  revalidatePath("/app/users");
+  redirect(`${employeePath(companyId, employeeId)}?portal=created`);
+}
+
+export async function resetEmployeeLoginAction(
+  companyId: string,
+  employeeId: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!isUuid(companyId) || !isUuid(employeeId)) return fail("Invalid employee.");
+  const parsed = resetPasswordSchema.safeParse(formToObject(formData));
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    const scope = await getScope();
+    await service.resetEmployeeLogin(scope, companyId, employeeId, parsed.data);
+  } catch (e) {
+    return handleError(e);
+  }
+  revalidatePath(employeePath(companyId, employeeId));
+  return success("Temporary password set. The employee must change it at next sign-in.");
+}
+
+export async function setEmployeeLoginActiveAction(
+  companyId: string,
+  employeeId: string,
+  isActive: boolean,
+  _prev: ActionResult,
+): Promise<ActionResult> {
+  if (!isUuid(companyId) || !isUuid(employeeId)) return fail("Invalid employee.");
+  try {
+    const scope = await getScope();
+    await service.setEmployeeLoginActive(scope, companyId, employeeId, isActive);
+  } catch (e) {
+    return handleError(e);
+  }
+  revalidatePath(employeePath(companyId, employeeId));
+  revalidatePath("/app/users");
+  return success(isActive ? "Login enabled." : "Login disabled.");
 }
 
 export async function changePasswordAction(

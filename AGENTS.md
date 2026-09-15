@@ -42,7 +42,7 @@ You are the implementer and auditor for a multi-company HRMS + Philippine payrol
 
 ## Do not
 
-- Do not add employee self-service, OAuth logins, email sending, or biometric device drivers unless the phase prompt says so.
+- Do not add OAuth logins or biometric device drivers unless the phase prompt says so. Employee self-service exists since Phase 9 (`src/modules/self-service`, routes under `/me`); an `EMPLOYEE` login never gets a staff permission — it reaches its own rows only through the `assertPermissionOrSelf` / `assertPermissionOrEmployee` checks, and nothing under `/me` takes an employee id from the URL.
 - Do not introduce a new library when an existing one covers the need. If you must, say why in the report.
 - Do not delete or rename migrations that have been applied.
 - Do not put secrets in code; use `.env` with `.env.example` kept up to date.

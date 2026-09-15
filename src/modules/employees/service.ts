@@ -5,8 +5,9 @@ import { AppError, NeedsConfirmError } from "@/lib/action-result";
 import { parseCsv, toCsv } from "@/lib/csv";
 import { toDateOnly, toIsoDate, todayInManila } from "@/lib/dates";
 import { assertCompanyAccess, type Scope } from "@/lib/scope";
-import { assertPermission } from "@/lib/session";
+import { assertPermission, assertPermissionOrSelf } from "@/lib/session";
 import { getCompany } from "@/modules/companies/service";
+import { disableEmployeeLogin } from "@/modules/auth/service";
 import * as repo from "./repo";
 import {
   CSV_COLUMNS,
@@ -71,8 +72,9 @@ export async function listEmployees(scope: Scope, companyId: string) {
   return rows.map(({ paySettings, ...e }) => ({ ...e, currentPay: paySettings[0] ?? null }));
 }
 
+/** Staff with employees.view, or the employee's own self-service login (Phase 9). */
 export async function getEmployee(scope: Scope, companyId: string, id: string) {
-  assertPermission(scope, "employees.view");
+  assertPermissionOrSelf(scope, "employees.view", id);
   assertCompanyAccess(scope, companyId);
   return repo.getEmployee(scope, companyId, id);
 }
@@ -225,6 +227,8 @@ export async function separateEmployee(
       { status: after.status, separationDate: after.separationDate, reason: input.reason },
       { scope, companyId, tx },
     );
+    // A separated employee loses portal access in the same transaction (audited as a User change).
+    await disableEmployeeLogin(tx, scope, companyId, id);
     return after;
   });
 }

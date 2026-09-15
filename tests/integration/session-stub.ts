@@ -4,11 +4,27 @@
  * Next.js request. The scope object is built by each test instead of from a session.
  */
 import { ForbiddenError } from "@/lib/action-result";
-import { roleCan, type Permission } from "@/lib/permissions";
+import { canActAsEmployee, canActOnEmployee, roleCan, type Permission } from "@/lib/permissions";
 import type { Scope } from "@/lib/scope-rules";
 
 export function assertPermission(scope: Scope, permission: Permission): void {
   if (!roleCan(scope.role, permission)) {
+    throw new ForbiddenError("You do not have permission to do that.");
+  }
+}
+
+export function assertPermissionOrSelf(
+  scope: Scope,
+  permission: Permission,
+  employeeId: string,
+): void {
+  if (!canActOnEmployee(scope, permission, employeeId)) {
+    throw new ForbiddenError("You do not have permission to do that.");
+  }
+}
+
+export function assertPermissionOrEmployee(scope: Scope, permission: Permission): void {
+  if (!canActAsEmployee(scope, permission)) {
     throw new ForbiddenError("You do not have permission to do that.");
   }
 }
@@ -20,4 +36,7 @@ export const getCurrentUser = notInTests;
 export const requireUser = notInTests;
 export const requirePermission = notInTests;
 export const requireCompany = notInTests;
+export const requireStaff = notInTests;
+export const requireEmployee = notInTests;
 export const getScope = notInTests;
+export const getAccountScope = notInTests;

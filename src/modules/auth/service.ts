@@ -1,14 +1,17 @@
 import "server-only";
+import type { Role } from "@/generated/prisma/enums";
 import { env } from "@/lib/env";
-import { audit } from "@/lib/audit";
+import { audit, type AuditWriter } from "@/lib/audit";
 import { AppError } from "@/lib/action-result";
 import { dummyHash, hashPassword, verifyPassword } from "@/lib/password";
-import type { Scope } from "@/lib/scope";
+import { postLoginPath } from "@/lib/routes";
+import { assertCompanyAccess, type Scope } from "@/lib/scope";
 import { assertPermission } from "@/lib/session";
 import * as repo from "./repo";
 import type {
   ChangePasswordInput,
   CreateUserInput,
+  EmployeeLoginInput,
   ResetPasswordInput,
   UpdateUserInput,
 } from "./schema";
@@ -20,7 +23,7 @@ export type LoginResult =
         id: string;
         email: string;
         name: string;
-        role: "ADMIN" | "PAYROLL_OFFICER" | "ENCODER";
+        role: Role;
         mustChangePassword: boolean;
       };
     }
@@ -113,10 +116,10 @@ export async function verifyLogin(
   };
 }
 
-/** Where to send a user right after a successful sign-in. */
+/** Where to send a user right after a successful sign-in (their area, or the password page first). */
 export async function postLoginDestination(email: string, requested: string): Promise<string> {
   const user = await repo.findUserByEmail(email);
-  return user?.mustChangePassword ? "/app/account/password" : requested;
+  return user ? postLoginPath(user.role, user.mustChangePassword, requested) : requested;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +176,8 @@ export async function updateUser(scope: Scope, id: string, input: UpdateUserInpu
   assertPermission(scope, "users.manage");
   const before = await repo.findUserById(id);
   if (!before) throw new AppError("User not found.");
+  if (before.role === "EMPLOYEE")
+    throw new AppError("Employee logins are managed from the employee's record.");
 
   if (id === scope.userId) {
     if (input.role !== before.role)
@@ -217,6 +222,164 @@ export async function resetPassword(scope: Scope, id: string, input: ResetPasswo
     await audit("User", id, "PASSWORD_RESET", null, { by: scope.userId }, { scope, tx });
     return after;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Employee self-service logins (Phase 9) — ADMIN or PAYROLL_OFFICER of the employee's company
+// ---------------------------------------------------------------------------
+
+export type EmployeeLoginView = {
+  id: string;
+  email: string;
+  isActive: boolean;
+  isLocked: boolean;
+  mustChangePassword: boolean;
+  lastLoginAt: Date | null;
+};
+
+type UserRow = NonNullable<Awaited<ReturnType<typeof repo.findUserByEmployeeId>>>;
+
+function toLoginView(u: UserRow): EmployeeLoginView {
+  return {
+    id: u.id,
+    email: u.email,
+    isActive: u.isActive,
+    isLocked: u.lockedUntil !== null && u.lockedUntil.getTime() > Date.now(),
+    mustChangePassword: u.mustChangePassword,
+    lastLoginAt: u.lastLoginAt,
+  };
+}
+
+async function employeeForLogin(scope: Scope, companyId: string, employeeId: string) {
+  assertPermission(scope, "employees.portal_access");
+  assertCompanyAccess(scope, companyId);
+  const employee = await repo.findEmployeeForLogin(scope, companyId, employeeId);
+  if (!employee) throw new AppError("Employee not found.");
+  return employee;
+}
+
+/** The login linked to an employee, or null when none was created yet. */
+export async function getEmployeeLogin(scope: Scope, companyId: string, employeeId: string) {
+  await employeeForLogin(scope, companyId, employeeId);
+  const user = await repo.findUserByEmployeeId(employeeId);
+  return user ? toLoginView(user) : null;
+}
+
+/** Creates the EMPLOYEE login: role EMPLOYEE, member of this company only, temporary password. */
+export async function createEmployeeLogin(
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+  input: EmployeeLoginInput,
+) {
+  const employee = await employeeForLogin(scope, companyId, employeeId);
+  if (employee.status === "SEPARATED")
+    throw new AppError("A separated employee cannot be given portal access.");
+  if (await repo.findUserByEmployeeId(employeeId))
+    throw new AppError("This employee already has a login.");
+  if (await repo.findUserByEmail(input.email))
+    throw new AppError("That email is already in use.", { email: ["Already in use"] });
+  const passwordHash = await hashPassword(input.password);
+  return repo.transaction(async (tx) => {
+    const user = await repo.createUser(
+      {
+        email: input.email,
+        name: `${employee.firstName} ${employee.lastName}`.trim(),
+        role: "EMPLOYEE",
+        passwordHash,
+        mustChangePassword: true,
+        companyIds: [companyId],
+        employeeId,
+      },
+      tx,
+    );
+    await audit(
+      "User",
+      user.id,
+      "CREATE",
+      null,
+      { email: user.email, role: user.role, employeeId, employeeNo: employee.employeeNo },
+      { scope, companyId, tx },
+    );
+    return toLoginView(user);
+  });
+}
+
+async function existingLogin(scope: Scope, companyId: string, employeeId: string) {
+  await employeeForLogin(scope, companyId, employeeId);
+  const user = await repo.findUserByEmployeeId(employeeId);
+  if (!user || user.role !== "EMPLOYEE") throw new AppError("This employee has no login yet.");
+  return user;
+}
+
+/** Temporary password for the employee's login; they must change it at next sign-in. */
+export async function resetEmployeeLogin(
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+  input: ResetPasswordInput,
+) {
+  const user = await existingLogin(scope, companyId, employeeId);
+  const passwordHash = await hashPassword(input.password);
+  return repo.transaction(async (tx) => {
+    const after = await repo.setPassword(user.id, passwordHash, true, tx);
+    await audit(
+      "User",
+      user.id,
+      "PASSWORD_RESET",
+      null,
+      { by: scope.userId, employeeId },
+      { scope, companyId, tx },
+    );
+    return toLoginView(after);
+  });
+}
+
+/** Enable or disable the employee's login (a disabled login cannot sign in; data is kept). */
+export async function setEmployeeLoginActive(
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+  isActive: boolean,
+) {
+  const user = await existingLogin(scope, companyId, employeeId);
+  if (user.isActive === isActive) return toLoginView(user);
+  return repo.transaction(async (tx) => {
+    const after = await repo.setUserActive(user.id, isActive, tx);
+    await audit(
+      "User",
+      user.id,
+      "UPDATE",
+      { isActive: user.isActive },
+      { isActive: after.isActive, employeeId },
+      { scope, companyId, tx },
+    );
+    return toLoginView(after);
+  });
+}
+
+/**
+ * Called by the employees module inside its separation transaction: an employee who left
+ * loses portal access at once. No permission check of its own — separation already had one.
+ */
+export async function disableEmployeeLogin(
+  tx: repo.UserWriter & AuditWriter,
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+): Promise<void> {
+  const user = await repo.findUserByEmployeeId(employeeId);
+  if (!user || user.role !== "EMPLOYEE" || !user.isActive) return;
+  const changed = await repo.disableEmployeeUser(tx, employeeId);
+  if (!changed) return;
+  await audit(
+    "User",
+    user.id,
+    "UPDATE",
+    { isActive: true },
+    { isActive: false, employeeId, reason: "separated" },
+    { scope, companyId, tx },
+  );
 }
 
 /** The signed-in user changes their own password. Caller must sign the user out afterwards (sessions are revoked). */

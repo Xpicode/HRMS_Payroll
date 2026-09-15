@@ -10,6 +10,8 @@ export type Scope = {
   /** `null` means unrestricted (ADMIN). Otherwise the exact list of allowed company ids. */
   companyIds: string[] | null;
   ip?: string | null;
+  /** EMPLOYEE logins only: the employee record the caller is (self-service, Phase 9). */
+  employeeId?: string | null;
 };
 
 export type TenantMode =

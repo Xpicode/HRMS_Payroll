@@ -315,6 +315,50 @@ export function getPayslip(db: Db, companyId: string, id: string) {
   });
 }
 
+/** Periods whose payslips employees may see in the self-service portal. */
+const VISIBLE_TO_EMPLOYEE = ["RELEASED", "LOCKED"] as const;
+
+export function listReleasedPayslipsOf(db: Db, companyId: string, employeeId: string) {
+  return db.payslip.findMany({
+    where: { companyId, employeeId, payPeriod: { status: { in: [...VISIBLE_TO_EMPLOYEE] } } },
+    select: {
+      id: true,
+      slipCode: true,
+      pdfPath: true,
+      finalPay: true,
+      daysWorked: true,
+      grossPay: true,
+      totalDeductions: true,
+      netPay: true,
+      payPeriod: {
+        select: {
+          id: true,
+          type: true,
+          coverageStart: true,
+          coverageEnd: true,
+          payDate: true,
+          sequenceInMonth: true,
+          status: true,
+        },
+      },
+    },
+    orderBy: [{ payPeriod: { payDate: "desc" } }, { computedAt: "desc" }],
+  });
+}
+
+export function getReleasedPayslipOf(db: Db, companyId: string, employeeId: string, id: string) {
+  return db.payslip.findFirst({
+    where: { id, companyId, employeeId, payPeriod: { status: { in: [...VISIBLE_TO_EMPLOYEE] } } },
+    include: {
+      lines: { orderBy: { order: "asc" } },
+      employee: {
+        select: { id: true, employeeNo: true, lastName: true, firstName: true, position: true },
+      },
+      payPeriod: true,
+    },
+  });
+}
+
 export function findPayslipByEmployee(
   db: Db,
   companyId: string,

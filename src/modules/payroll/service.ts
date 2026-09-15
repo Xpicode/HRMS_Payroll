@@ -13,7 +13,7 @@ import {
   type Cutoff,
 } from "@/lib/dates";
 import { assertCompanyAccess, isAdmin, type Scope, type ScopedTx } from "@/lib/scope";
-import { assertPermission } from "@/lib/session";
+import { assertPermission, assertPermissionOrSelf } from "@/lib/session";
 import { getCompany, getPolicyOn } from "@/modules/companies/service";
 import { getEmployee, listEmployeesForPayroll } from "@/modules/employees/service";
 import { cutoffOverview, paySettingOn } from "@/modules/attendance/service";
@@ -898,6 +898,34 @@ export async function getPayslip(scope: Scope, companyId: string, payslipId: str
   assertPermission(scope, "payroll.view");
   assertCompanyAccess(scope, companyId);
   const slip = await repo.getPayslip(repo.root(scope), companyId, payslipId);
+  if (!slip) return null;
+  return {
+    ...slip,
+    flags: slip.flags as unknown as PayslipFlag[],
+    computation: slip.computation as unknown as StoredComputation,
+    snapshot: slip.snapshot as unknown as PayslipSnapshot | null,
+  };
+}
+
+/**
+ * Self-service (Phase 9): one employee's payslips in RELEASED / LOCKED periods only — nothing
+ * an officer is still reviewing. Staff with payroll.view may call these for any employee.
+ */
+export async function listReleasedPayslipsOf(scope: Scope, companyId: string, employeeId: string) {
+  assertPermissionOrSelf(scope, "payroll.view", employeeId);
+  assertCompanyAccess(scope, companyId);
+  return repo.listReleasedPayslipsOf(repo.root(scope), companyId, employeeId);
+}
+
+export async function getReleasedPayslipOf(
+  scope: Scope,
+  companyId: string,
+  employeeId: string,
+  payslipId: string,
+) {
+  assertPermissionOrSelf(scope, "payroll.view", employeeId);
+  assertCompanyAccess(scope, companyId);
+  const slip = await repo.getReleasedPayslipOf(repo.root(scope), companyId, employeeId, payslipId);
   if (!slip) return null;
   return {
     ...slip,

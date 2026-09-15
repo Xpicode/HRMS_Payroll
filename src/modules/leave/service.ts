@@ -5,7 +5,11 @@ import { AppError } from "@/lib/action-result";
 import { toIsoDate, todayInManila } from "@/lib/dates";
 import { Decimal, round2 } from "@/lib/money";
 import { assertCompanyAccess, type Scope, type ScopedTx } from "@/lib/scope";
-import { assertPermission } from "@/lib/session";
+import {
+  assertPermission,
+  assertPermissionOrEmployee,
+  assertPermissionOrSelf,
+} from "@/lib/session";
 import {
   leaveCalendar,
   removeLeaveRecords,
@@ -31,7 +35,7 @@ const fmtDays = (v: Decimal) => (v.isInteger() ? v.toFixed(0) : v.toFixed(2));
 // ---------------------------------------------------------------------------
 
 export async function listLeaveTypes(scope: Scope, companyId: string, includeInactive = false) {
-  assertPermission(scope, "leave.view");
+  assertPermissionOrEmployee(scope, "leave.view");
   assertCompanyAccess(scope, companyId);
   return repo.listTypes(repo.root(scope), companyId, includeInactive);
 }
@@ -118,7 +122,7 @@ export async function employeeBalances(
   employeeId: string,
   year: number,
 ): Promise<BalanceView[]> {
-  assertPermission(scope, "leave.view");
+  assertPermissionOrSelf(scope, "leave.view", employeeId);
   assertCompanyAccess(scope, companyId);
   const db = repo.root(scope);
   const [types, balances] = await Promise.all([
@@ -285,7 +289,9 @@ export async function listRequests(
   companyId: string,
   filter: { status?: LeaveRequestStatus; employeeId?: string; take?: number } = {},
 ) {
-  assertPermission(scope, "leave.view");
+  // An employee login may list only its own requests (filter.employeeId must be itself).
+  if (filter.employeeId) assertPermissionOrSelf(scope, "leave.view", filter.employeeId);
+  else assertPermission(scope, "leave.view");
   assertCompanyAccess(scope, companyId);
   return repo.listRequests(repo.root(scope), companyId, filter);
 }
@@ -325,7 +331,7 @@ async function planFor(
 }
 
 export async function createRequest(scope: Scope, companyId: string, input: LeaveRequestInput) {
-  assertPermission(scope, "leave.request");
+  assertPermissionOrSelf(scope, "leave.request", input.employeeId);
   assertCompanyAccess(scope, companyId);
   const db = repo.root(scope);
   const [type, employee] = await Promise.all([
@@ -486,10 +492,12 @@ export async function rejectRequest(
  * pay period.
  */
 export async function cancelRequest(scope: Scope, companyId: string, id: string) {
-  assertPermission(scope, "leave.request");
+  assertPermissionOrEmployee(scope, "leave.request");
   assertCompanyAccess(scope, companyId);
   const request = await repo.getRequest(repo.root(scope), companyId, id);
   if (!request) throw new AppError("Leave request not found.");
+  // An employee may withdraw only their own request; staff need leave.request.
+  assertPermissionOrSelf(scope, "leave.request", request.employeeId);
   if (request.status === "APPROVED") {
     assertPermission(scope, "leave.approve");
     const start = toIsoDate(request.startDate);

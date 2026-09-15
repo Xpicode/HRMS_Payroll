@@ -5,7 +5,7 @@ import { AppError } from "@/lib/action-result";
 import { parseCsv } from "@/lib/csv";
 import { dayOfWeek, daysInMonth, eachDay, toDateOnly, toIsoDate, type Cutoff } from "@/lib/dates";
 import { assertCompanyAccess, type Scope, type ScopedTx } from "@/lib/scope";
-import { assertPermission } from "@/lib/session";
+import { assertPermission, assertPermissionOrSelf } from "@/lib/session";
 import { getLimiter } from "@/lib/rate-limit";
 import { getCompany, listHolidaysInRange } from "@/modules/companies/service";
 import * as repo from "./repo";
@@ -288,7 +288,8 @@ export async function employeeDtr(
   employeeId: string,
   cutoff: Cutoff,
 ) {
-  assertPermission(scope, "attendance.view");
+  // Staff, or the employee reading their own DTR from the self-service portal.
+  assertPermissionOrSelf(scope, "attendance.view", employeeId);
   assertCompanyAccess(scope, companyId);
   const employee = await repo.getEmployeeWithPaySettings(scope, companyId, employeeId);
   if (!employee) throw new AppError("Employee not found.");
@@ -437,7 +438,7 @@ export async function leaveCalendar(
   start: string,
   end: string,
 ): Promise<LeaveCalendarDay[]> {
-  assertPermission(scope, "attendance.view");
+  assertPermissionOrSelf(scope, "attendance.view", employeeId);
   assertCompanyAccess(scope, companyId);
   const employee = await repo.getEmployeeWithPaySettings(scope, companyId, employeeId);
   if (!employee) throw new AppError("Employee not found.");

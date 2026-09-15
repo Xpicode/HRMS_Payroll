@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getScope, requirePermission } from "@/lib/session";
 import { isUuid } from "@/lib/request";
 import { getUser } from "@/modules/auth/service";
@@ -19,6 +19,9 @@ export default async function EditUserPage({ params }: { params: Promise<{ userI
   const scope = await getScope();
   const [user, companies] = await Promise.all([getUser(scope, userId), listCompanies(scope)]);
   if (!user) notFound();
+  // Employee logins are managed from the employee's record (Portal access card).
+  if (user.role === "EMPLOYEE" && user.employee)
+    redirect(`/app/${user.employee.companyId}/employees/${user.employee.id}`);
 
   return (
     <>
