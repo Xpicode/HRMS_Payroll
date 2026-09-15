@@ -7,6 +7,7 @@ import { UserMenu } from "./user-menu";
 import { NavSection, type NavItem } from "./nav";
 import { PageTransition } from "./page-transition";
 import { MobileTabBar } from "./mobile-tab-bar";
+import { AmbientBackground } from "./ambient-background";
 import type { CompanySummary, CurrentUser } from "@/lib/session";
 import { roleCan } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -72,7 +73,7 @@ function SidebarBody({ user, currentCompany, rail }: Omit<Props, "children"> & {
           rail && "md:max-lg:justify-center md:max-lg:px-0",
         )}
       >
-        <span className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary font-heading text-sm font-bold text-sidebar-primary-foreground shadow-[0_0_0_0_var(--sidebar-primary)] transition-[transform,box-shadow] duration-300 group-hover:rotate-[-6deg] group-hover:shadow-[0_0_24px_-6px_var(--sidebar-primary)]">
+        <span className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary font-heading text-sm font-bold text-sidebar-primary-foreground shadow-[0_0_16px_-4px_var(--sidebar-primary),inset_0_1px_0_0_rgba(255,255,255,0.25)] transition-[transform,box-shadow] duration-300 ease-out-expo group-hover:-rotate-6 group-hover:shadow-[0_0_28px_-4px_var(--sidebar-primary),inset_0_1px_0_0_rgba(255,255,255,0.25)]">
           U
         </span>
         <span
@@ -107,13 +108,14 @@ function SidebarBody({ user, currentCompany, rail }: Omit<Props, "children"> & {
 export function AppShell({ user, currentCompany, children }: Props) {
   return (
     <div className="flex min-h-svh w-full">
-      <aside className="hidden w-[4.25rem] shrink-0 border-r border-sidebar-border bg-sidebar bg-[radial-gradient(40rem_24rem_at_0%_0%,oklch(0.36_0.09_262/0.55),transparent_70%)] transition-[width] duration-300 md:block lg:w-64">
+      <AmbientBackground />
+      <aside className="hidden w-[4.25rem] shrink-0 border-r border-sidebar-border bg-sidebar/80 bg-[radial-gradient(40rem_24rem_at_0%_0%,oklch(0.36_0.09_262/0.55),transparent_70%)] backdrop-blur-xl transition-[width] duration-300 md:block lg:w-64 dark:bg-[radial-gradient(32rem_20rem_at_0%_0%,rgba(94,106,210,0.16),transparent_70%)]">
         <div className="sticky top-0 h-svh">
           <SidebarBody user={user} currentCompany={currentCompany} rail />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b bg-card/80 px-3 backdrop-blur-md md:hidden">
+        <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur-xl md:hidden">
           <Sheet>
             <SheetTrigger
               render={<Button variant="ghost" size="icon" aria-label="Open navigation" />}

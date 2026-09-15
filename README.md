@@ -327,6 +327,18 @@ docker/                  dev image + entrypoint
 - **Load check** (`pnpm load-check`): a throw-away 200-employee company over one cutoff — compute ≈ 2 s,
   approve ≈ 1 s, 200 payslip PDFs + batch ≈ 60 s on the dev PC (budget 2 min).
 
+## Look and feel
+
+Dark by default in the "Linear / modern" idiom — near-black canvas (`#050506`), off-white text, one indigo accent
+(`#5E6AD2`) that does all the glowing, hairline borders at 6–10 % white — with a light theme one click away
+(account menu → Appearance: Light / Dark / System; `next-themes`, class strategy). Everything is driven by the tokens in
+`src/app/globals.css`: colours per theme, three-layer shadows (`shadow-card`, `shadow-card-hover`, `shadow-accent`),
+expo-out easing, and the utilities `.surface` (gradient glass + top highlight), `.spotlight` (cursor-tracking glow,
+see `SpotlightCard`), `.text-gradient`, `.eyebrow`, `.stagger` / `.page-enter`. `AmbientBackground` layers noise, a
+64 px grid and floating light pools behind every screen (faint in the app, bright on sign-in; invisible in light mode).
+All motion is CSS, 200–600 ms, and disabled under `prefers-reduced-motion`. Payslip PDFs are rendered from their own
+standalone template and are unaffected by the theme.
+
 ## Conventions worth knowing
 
 - Money and rates are `Decimal` in the database and strings/`decimal.js` in code — never JS numbers.

@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logoutAction } from "@/modules/auth/actions";
+import { ThemeMenuItems } from "@/components/theme-toggle";
 import { ROLE_LABELS } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,11 @@ export function UserMenu({ user, rail }: Props) {
             <KeyRoundIcon />
             Change password
           </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Appearance</DropdownMenuLabel>
+          <ThemeMenuItems />
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <form action={logoutAction}>

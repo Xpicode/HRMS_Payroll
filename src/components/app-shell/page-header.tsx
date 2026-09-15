@@ -13,12 +13,17 @@ export function PageHeader({ title, description, eyebrow, actions, className }: 
     <div className={cn("mb-6 flex flex-wrap items-end justify-between gap-4", className)}>
       <div className="min-w-0">
         {eyebrow ? (
-          <p className="mb-1 flex items-center gap-1.5 font-mono text-[11px] tracking-wider text-muted-foreground uppercase">
-            <span className="size-1.5 rounded-full bg-brand" aria-hidden />
+          <p className="eyebrow mb-1.5 flex items-center gap-2">
+            <span
+              className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]"
+              aria-hidden
+            />
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="text-2xl font-semibold text-balance">{title}</h1>
+        <h1 className="text-gradient text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+          {title}
+        </h1>
         {description ? (
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>
         ) : null}

@@ -69,12 +69,13 @@ export function NavSection({
                 aria-current={active ? "page" : undefined}
                 title={rail ? item.label : undefined}
                 className={cn(
-                  "group/nav relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/85 transition-[background-color,color,transform] duration-200 hover:translate-x-0.5 hover:bg-sidebar-accent hover:text-sidebar-foreground active:translate-x-0",
+                  "group/nav relative flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-[background-color,color,transform] duration-200 ease-out-expo hover:translate-x-0.5 hover:bg-sidebar-accent hover:text-sidebar-foreground active:translate-x-0",
                   rail &&
                     "md:max-lg:justify-center md:max-lg:px-0 md:max-lg:py-2 md:max-lg:hover:translate-x-0",
                   // the gold bar grows in from the middle when a section becomes current
-                  "before:absolute before:top-1/2 before:left-0 before:h-0 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-primary before:transition-[height] before:duration-300 before:ease-out",
-                  active && "bg-sidebar-accent font-medium text-sidebar-foreground before:h-4",
+                  "before:absolute before:top-1/2 before:left-0 before:h-0 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-primary before:shadow-[0_0_10px_var(--sidebar-primary)] before:transition-[height] before:duration-300 before:ease-out-expo",
+                  active &&
+                    "bg-sidebar-accent font-medium text-sidebar-foreground shadow-inset-top before:h-4",
                 )}
               >
                 <Icon

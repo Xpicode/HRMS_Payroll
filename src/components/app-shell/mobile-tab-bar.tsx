@@ -49,7 +49,7 @@ export function MobileTabBar({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
       aria-label="Quick navigation"
     >
       <ul className="flex items-stretch px-2 pt-1">
@@ -64,8 +64,8 @@ export function MobileTabBar({
               >
                 <span
                   className={cn(
-                    "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
-                    active && "bg-primary/10",
+                    "flex h-7 w-12 items-center justify-center rounded-full transition-[background-color,box-shadow] duration-200",
+                    active && "bg-primary/15 shadow-[0_0_16px_-4px_var(--primary)]",
                   )}
                 >
                   <item.icon className="size-5" />

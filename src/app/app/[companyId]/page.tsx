@@ -15,6 +15,7 @@ import { countActiveJobs } from "@/modules/documents/service";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { CompanyMark } from "@/components/company-mark";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -244,7 +245,7 @@ function Stat({
     <>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
-        className={`mt-1 truncate text-lg font-semibold ${mono ? "font-mono" : ""} ${className ?? ""}`}
+        className={`mt-1 truncate text-lg font-semibold tracking-tight ${mono ? "font-mono" : ""} ${className ?? ""}`}
       >
         {value}
       </p>
@@ -253,18 +254,16 @@ function Stat({
   );
   if (href) {
     return (
-      <Card className="surface-hover py-4 has-[a:focus-visible]:ring-ring">
-        <CardContent>
-          <Link href={href} className="block outline-none">
-            {body}
-          </Link>
-        </CardContent>
-      </Card>
+      <SpotlightCard className="has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/60">
+        <Link href={href} className="relative z-10 block p-4 outline-none">
+          {body}
+        </Link>
+      </SpotlightCard>
     );
   }
   return (
-    <Card className="py-4">
-      <CardContent>{body}</CardContent>
-    </Card>
+    <SpotlightCard interactive={false} className="p-4">
+      <div className="relative z-10">{body}</div>
+    </SpotlightCard>
   );
 }

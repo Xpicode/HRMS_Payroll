@@ -53,11 +53,82 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Shadows and easing are tokens too: every elevated surface uses the same three layers. */
+  --shadow-card: var(--card-shadow);
+  --shadow-card-hover: var(--card-shadow-hover);
+  --shadow-accent: var(--accent-shadow);
+  --shadow-inset-top: var(--inset-top-shadow);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-up: fade-up 0.6s var(--ease-out-expo) both;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-scale-in: scale-in 0.5s var(--ease-out-expo) both;
+  --animate-float: float 9s ease-in-out infinite;
+  --animate-float-slow: float 14s ease-in-out infinite reverse;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-text-shimmer: text-shimmer 6s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate3d(0, -20px, 0) rotate(1deg);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes text-shimmer {
+    to {
+      background-position: 200% center;
+    }
+  }
 }
 
 /*
-  Palette: cool paper background, ink-navy primary (from the Upright globe),
-  a restrained gold accent for "current company" and highlights.
+  Two themes, one accent.
+
+  Dark (default): "Linear / modern" — near-black canvas (#050506, never pure black), off-white
+  text (#EDEDEF), a single indigo accent (#5E6AD2) that does all the glowing, hairline borders
+  at 6–10 % white. Depth comes from layered translucency and ambient light, not from colour.
+
+  Light: the original cool-paper palette with ink-navy, kept for people who prefer a bright
+  screen (toggle in the account menu). Company marks keep their gold in both.
 */
 :root {
   --background: oklch(0.985 0.004 250);
@@ -99,42 +170,75 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.32 0.04 262);
   --sidebar-ring: oklch(0.8 0.15 80);
+  --glow: oklch(0.36 0.09 262);
+  --card-shadow:
+    0 0 0 1px oklch(0.2 0.02 260 / 0.06), 0 1px 2px oklch(0.2 0.02 260 / 0.04),
+    0 8px 24px -12px oklch(0.2 0.02 260 / 0.12);
+  --card-shadow-hover:
+    0 0 0 1px oklch(0.2 0.02 260 / 0.1), 0 8px 28px -8px oklch(0.2 0.02 260 / 0.18),
+    0 0 48px -12px oklch(0.36 0.09 262 / 0.18);
+  --accent-shadow:
+    0 0 0 1px oklch(0.36 0.09 262 / 0.5), 0 4px 12px oklch(0.36 0.09 262 / 0.3),
+    inset 0 1px 0 0 oklch(1 0 0 / 0.2);
+  --inset-top-shadow: inset 0 1px 0 0 oklch(1 0 0 / 0.6);
+  --surface-gradient: linear-gradient(to bottom, oklch(1 0 0), oklch(0.995 0.002 250));
 }
 
 .dark {
-  --background: oklch(0.16 0.02 260);
-  --foreground: oklch(0.95 0.01 250);
-  --card: oklch(0.2 0.02 260);
-  --card-foreground: oklch(0.95 0.01 250);
-  --popover: oklch(0.2 0.02 260);
-  --popover-foreground: oklch(0.95 0.01 250);
-  --primary: oklch(0.8 0.1 262);
-  --primary-foreground: oklch(0.16 0.03 262);
-  --secondary: oklch(0.26 0.02 260);
-  --secondary-foreground: oklch(0.95 0.01 250);
-  --muted: oklch(0.26 0.02 260);
-  --muted-foreground: oklch(0.7 0.02 255);
-  --accent: oklch(0.28 0.03 262);
-  --accent-foreground: oklch(0.95 0.01 250);
+  --background: #050506;
+  --foreground: #ededef;
+  --card: #0c0c0f;
+  --card-foreground: #ededef;
+  --popover: #0f0f12;
+  --popover-foreground: #ededef;
+  --primary: #5e6ad2;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #ededef;
+  --muted: rgba(255, 255, 255, 0.05);
+  --muted-foreground: #8a8f98;
+  --accent: rgba(255, 255, 255, 0.06);
+  --accent-foreground: #ededef;
   --destructive: oklch(0.7 0.18 25);
-  --success: oklch(0.7 0.14 150);
-  --success-foreground: oklch(0.15 0 0);
+  --success: oklch(0.72 0.14 150);
+  --success-foreground: #050506;
   --warning: oklch(0.8 0.15 80);
   --warning-foreground: oklch(0.2 0.05 80);
   --brand: oklch(0.82 0.15 80);
   --brand-foreground: oklch(0.2 0.05 80);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.6 0.1 262);
-  --sidebar: oklch(0.14 0.03 262);
-  --sidebar-foreground: oklch(0.93 0.01 250);
-  --sidebar-muted: oklch(0.65 0.02 255);
-  --sidebar-primary: oklch(0.82 0.15 80);
-  --sidebar-primary-foreground: oklch(0.2 0.05 80);
-  --sidebar-accent: oklch(0.24 0.04 262);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.26 0.03 262);
-  --sidebar-ring: oklch(0.82 0.15 80);
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #5e6ad2;
+  --chart-1: #5e6ad2;
+  --chart-2: oklch(0.82 0.15 80);
+  --chart-3: oklch(0.72 0.14 150);
+  --chart-4: oklch(0.7 0.12 300);
+  --chart-5: oklch(0.7 0.18 25);
+  --sidebar: #08080a;
+  --sidebar-foreground: #ededef;
+  --sidebar-muted: #8a8f98;
+  --sidebar-primary: #5e6ad2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #ededef;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: #5e6ad2;
+  --glow: #5e6ad2;
+  --card-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06), 0 2px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 0, 0, 0.2);
+  --card-shadow-hover:
+    0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 40px rgba(0, 0, 0, 0.5),
+    0 0 80px rgba(94, 106, 210, 0.1);
+  --accent-shadow:
+    0 0 0 1px rgba(94, 106, 210, 0.5), 0 4px 12px rgba(94, 106, 210, 0.3),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  --inset-top-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  --surface-gradient: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.01)
+  );
+  color-scheme: dark;
 }
 
 @layer base {
@@ -146,6 +250,14 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Layer 1: the base gradient — light from the top, darkest at the bottom. */
+    background-image: radial-gradient(ellipse at top, #0a0a0f 0%, #050506 50%, #020203 100%);
+    background-attachment: fixed;
+  }
+  :root:not(.dark) body {
+    background-image:
+      radial-gradient(60rem 40rem at 10% -10%, oklch(0.36 0.09 262 / 0.05), transparent 60%),
+      radial-gradient(40rem 30rem at 100% 0%, oklch(0.8 0.15 80 / 0.06), transparent 60%);
   }
   h1,
   h2,
@@ -155,64 +267,156 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
-}
-
-/* ---------------------------------------------------------------------------
-   Motion. Small, quick, and only where it explains something: content settling
-   into place, a card lifting when it is clickable, a value changing. Everything
-   here is off for people who asked their OS for reduced motion.
-   --------------------------------------------------------------------------- */
-@theme inline {
-  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-fade-up: fade-up 0.45s var(--ease-out-soft) both;
-  --animate-fade-in: fade-in 0.3s ease-out both;
-  --animate-float: float 14s ease-in-out infinite alternate;
-  --animate-shimmer: shimmer 1.6s linear infinite;
-
-  @keyframes fade-up {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+  /* Thin, quiet scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+  }
+  /* Touch screens: 40 px targets, 16 px inputs (no iOS zoom), roomier rows. */
+  @media (pointer: coarse) {
+    [data-slot="input"],
+    [data-slot="button"]:not([data-size^="icon"]),
+    select,
+    textarea {
+      min-height: 2.5rem;
     }
-    to {
-      opacity: 1;
-      transform: translateY(0);
+    [data-slot="input"],
+    select {
+      font-size: 1rem;
+    }
+    [data-slot="table-row"] > td {
+      padding-block: 0.75rem;
     }
   }
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  @keyframes float {
-    from {
-      transform: translate3d(0, 0, 0) scale(1);
-    }
-    to {
-      transform: translate3d(6%, -8%, 0) scale(1.12);
-    }
-  }
-  @keyframes shimmer {
-    from {
-      background-position: 200% 0;
-    }
-    to {
-      background-position: -200% 0;
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }
 
 @layer components {
-  /* A page's content settling in; children marked .stagger-item arrive one after another. */
+  /* ---- Ambient light: noise, grid and floating blobs (see AmbientBackground) ------------- */
+  .noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.015;
+  }
+  .grid-lines {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+    background-size: 64px 64px;
+    opacity: 0.02;
+  }
+  .blob {
+    position: absolute;
+    border-radius: 9999px;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* ---- Surfaces --------------------------------------------------------------------------- */
+  /* A card: gradient glass over the canvas, three-layer shadow, 1 px highlight along the top. */
+  .surface {
+    position: relative;
+    background-color: var(--card);
+    background-image: var(--surface-gradient);
+    box-shadow: var(--card-shadow);
+    transition:
+      box-shadow 0.3s var(--ease-out-expo),
+      transform 0.3s var(--ease-out-expo);
+  }
+  .surface::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    border-radius: inherit;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.12), transparent);
+    pointer-events: none;
+  }
+  :root:not(.dark) .surface::before {
+    background: linear-gradient(to right, transparent, oklch(1 0 0 / 0.9), transparent);
+  }
+  /* Clickable surfaces lift 4 px and glow; static ones never move. */
+  .surface-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--card-shadow-hover);
+  }
+  .surface-hover:active {
+    transform: translateY(-2px) scale(0.995);
+  }
+  /* Mouse-tracking spotlight (SpotlightCard sets --x / --y). */
+  .spotlight::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      300px circle at var(--x, 50%) var(--y, 50%),
+      color-mix(in oklch, var(--glow) 15%, transparent),
+      transparent 60%
+    );
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-out-expo);
+    pointer-events: none;
+  }
+  .spotlight:hover::after {
+    opacity: 1;
+  }
+  .glass {
+    background-color: color-mix(in oklch, var(--card) 80%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+  }
+
+  /* ---- Typography ------------------------------------------------------------------------- */
+  .text-gradient {
+    background-image: linear-gradient(
+      to bottom,
+      var(--foreground),
+      color-mix(in oklch, var(--foreground) 92%, transparent),
+      color-mix(in oklch, var(--foreground) 68%, transparent)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-accent-shimmer {
+    background-image: linear-gradient(
+      to right,
+      var(--primary),
+      color-mix(in oklch, var(--primary) 60%, white),
+      var(--primary)
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: var(--animate-text-shimmer);
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* ---- Motion ----------------------------------------------------------------------------- */
   .page-enter {
     animation: var(--animate-fade-up);
   }
   .stagger > * {
     animation: var(--animate-fade-up);
-    animation-delay: calc(var(--stagger-step, 45ms) * var(--i, 0));
+    animation-delay: calc(var(--stagger-step, 80ms) * var(--i, 0));
   }
   .stagger > *:nth-child(1) {
     --i: 0;
@@ -241,122 +445,38 @@
   .stagger > *:nth-child(n + 9) {
     --i: 8;
   }
-
-  /* Clickable surfaces lift a little; static ones do not move. */
-  .surface-hover {
-    transition:
-      transform 0.25s var(--ease-out-soft),
-      box-shadow 0.25s var(--ease-out-soft),
-      border-color 0.25s;
-  }
-  .surface-hover:hover {
-    transform: translateY(-2px);
-    box-shadow:
-      0 1px 2px oklch(0.2 0.02 260 / 0.04),
-      0 12px 28px -12px oklch(0.2 0.02 260 / 0.18);
-  }
-
-  /* Loading placeholders: a soft sweep rather than a blink. */
-  .shimmer {
-    background: linear-gradient(
-      100deg,
-      var(--muted) 30%,
-      color-mix(in oklch, var(--muted), white 45%) 50%,
-      var(--muted) 70%
-    );
-    background-size: 200% 100%;
-    animation: var(--animate-shimmer);
-  }
-
-  /* Sign-in backdrop: two slow, blurred lights over the ink-navy panel and a faint grid. */
-  .aurora {
-    position: absolute;
-    inset: 0;
+  /* Primary button shine: a light sweep across on hover. */
+  .shine {
+    position: relative;
     overflow: hidden;
-    pointer-events: none;
   }
-  .aurora::before,
-  .aurora::after {
+  .shine::before {
     content: "";
     position: absolute;
-    border-radius: 9999px;
-    filter: blur(70px);
-    opacity: 0.55;
-    animation: var(--animate-float);
-  }
-  .aurora::before {
-    width: 46rem;
-    height: 46rem;
-    left: -14rem;
-    top: -18rem;
-    background: radial-gradient(closest-side, oklch(0.55 0.12 262), transparent 70%);
-  }
-  .aurora::after {
-    width: 34rem;
-    height: 34rem;
-    right: -10rem;
-    bottom: -14rem;
-    background: radial-gradient(closest-side, oklch(0.8 0.15 80 / 0.9), transparent 70%);
-    animation-duration: 18s;
-    animation-direction: alternate-reverse;
-  }
-  .grid-overlay {
-    position: absolute;
     inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(255, 255, 255, 0.18) 50%,
+      transparent 60%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.6s var(--ease-out-expo);
     pointer-events: none;
-    background-image:
-      linear-gradient(to right, oklch(1 0 0 / 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, oklch(1 0 0 / 0.05) 1px, transparent 1px);
-    background-size: 2.5rem 2.5rem;
-    mask-image: radial-gradient(ellipse at 30% 30%, black 20%, transparent 75%);
   }
-}
+  .shine:hover::before {
+    transform: translateX(120%);
+  }
 
-@layer base {
-  /* Paper with a hint of light from the top-left, so cards read as surfaces. */
-  body {
-    background-image:
-      radial-gradient(60rem 40rem at 10% -10%, oklch(0.36 0.09 262 / 0.05), transparent 60%),
-      radial-gradient(40rem 30rem at 100% 0%, oklch(0.8 0.15 80 / 0.06), transparent 60%);
-    background-attachment: fixed;
-  }
-  .dark body {
-    background-image:
-      radial-gradient(60rem 40rem at 10% -10%, oklch(0.6 0.1 262 / 0.1), transparent 60%),
-      radial-gradient(40rem 30rem at 100% 0%, oklch(0.8 0.15 80 / 0.06), transparent 60%);
-  }
-  /* Thin, quiet scrollbars. */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   Any device. Wide tables scroll inside their card with edge shadows, section tabs
-   scroll instead of clipping, and on touch screens every control grows to a
-   comfortable 40px target. The sidebar becomes a bottom tab bar under `md`.
-   --------------------------------------------------------------------------- */
-@layer components {
-  /* Shadows that appear only on the side that has more content (scroll-attached gradients). */
+  /* ---- Scrolling tables / tabs --------------------------------------------------------------- */
   .scroll-shadow {
     background:
       linear-gradient(to right, var(--card) 40%, transparent) left / 2rem 100% no-repeat local,
       linear-gradient(to left, var(--card) 40%, transparent) right / 2rem 100% no-repeat local,
-      linear-gradient(to right, oklch(0.2 0.02 260 / 0.14), transparent) left / 0.9rem 100%
-        no-repeat scroll,
-      linear-gradient(to left, oklch(0.2 0.02 260 / 0.14), transparent) right / 0.9rem 100%
-        no-repeat scroll;
+      linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent) left / 0.9rem 100% no-repeat
+        scroll,
+      linear-gradient(to left, rgba(0, 0, 0, 0.35), transparent) right / 0.9rem 100% no-repeat
+        scroll;
   }
   .scrollbar-none {
     scrollbar-width: none;
@@ -364,22 +484,14 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
-}
-
-@layer base {
-  @media (pointer: coarse) {
-    [data-slot="input"],
-    [data-slot="button"]:not([data-size^="icon"]),
-    select,
-    textarea {
-      min-height: 2.5rem;
-    }
-    [data-slot="input"],
-    select {
-      font-size: 1rem; /* stops iOS zooming into fields */
-    }
-    [data-slot="table-row"] > td {
-      padding-block: 0.75rem;
-    }
+  .shimmer {
+    background: linear-gradient(
+      100deg,
+      var(--muted) 30%,
+      color-mix(in oklch, var(--muted), var(--foreground) 8%) 50%,
+      var(--muted) 70%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
   }
 }
