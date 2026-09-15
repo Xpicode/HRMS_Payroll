@@ -22,6 +22,11 @@ export async function seedDemoCompany(prisma: PrismaClient) {
   const existing = await prisma.company.findUnique({ where: { code: "DEMO" } });
   if (existing) {
     console.log("Demo company already exists — skipping.");
+    const first = await prisma.employee.findFirst({
+      where: { companyId: existing.id, employeeNo: "DEMO-0001" },
+      select: { id: true },
+    });
+    if (first) await seedDemoLogin(prisma, existing.id, first.id);
     return;
   }
 
@@ -187,34 +192,7 @@ export async function seedDemoCompany(prisma: PrismaClient) {
     });
     firstEmployeeId ??= created.id;
   }
-  if (
-    firstEmployeeId &&
-    !(await prisma.user.findUnique({ where: { email: "dorothy@example.com" } }))
-  ) {
-    const login = await prisma.user.create({
-      data: {
-        email: "dorothy@example.com",
-        name: "Dorothy Dela Cruz",
-        role: "EMPLOYEE",
-        passwordHash: await bcrypt.hash("Dorothy-Demo-2026", 12),
-        mustChangePassword: true,
-        employeeId: firstEmployeeId,
-        companies: { create: { companyId: company.id } },
-      },
-    });
-    await prisma.auditLog.create({
-      data: {
-        entity: "User",
-        entityId: login.id,
-        action: "CREATE",
-        companyId: company.id,
-        after: { email: login.email, role: "EMPLOYEE", employeeNo: "DEMO-0001", seeded: true },
-      },
-    });
-    console.log(
-      "Created demo employee login dorothy@example.com (must change password at first sign-in).",
-    );
-  }
+  if (firstEmployeeId) await seedDemoLogin(prisma, company.id, firstEmployeeId);
   await prisma.auditLog.create({
     data: {
       entity: "Company",
@@ -225,4 +203,36 @@ export async function seedDemoCompany(prisma: PrismaClient) {
     },
   });
   console.log(`Created demo company DEMO with ${employees.length} employees.`);
+}
+
+/** The portal login for DEMO-0001 (Phase 9); idempotent, and skipped if the employee already has one. */
+async function seedDemoLogin(prisma: PrismaClient, companyId: string, employeeId: string) {
+  const taken = await prisma.user.findFirst({
+    where: { OR: [{ email: "dorothy@example.com" }, { employeeId }] },
+    select: { id: true },
+  });
+  if (taken) return;
+  const login = await prisma.user.create({
+    data: {
+      email: "dorothy@example.com",
+      name: "Dorothy Dela Cruz",
+      role: "EMPLOYEE",
+      passwordHash: await bcrypt.hash("Dorothy-Demo-2026", 12),
+      mustChangePassword: true,
+      employeeId,
+      companies: { create: { companyId } },
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      entity: "User",
+      entityId: login.id,
+      action: "CREATE",
+      companyId,
+      after: { email: login.email, role: "EMPLOYEE", employeeNo: "DEMO-0001", seeded: true },
+    },
+  });
+  console.log(
+    "Created demo employee login dorothy@example.com (must change password at first sign-in).",
+  );
 }
